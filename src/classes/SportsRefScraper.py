@@ -1,7 +1,9 @@
 import os
+import warnings
 from io import StringIO
 from time import sleep
 
+import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -80,6 +82,8 @@ class SportsRefScraper:
 
         df = self._filter_non_data_rows(df, original_columns)
         df = df.reset_index(drop=True)
+        df = self._set_df_dtypes(df)
+        df = self._fill_df_missing_values(df)
 
         return df
 
@@ -100,6 +104,23 @@ class SportsRefScraper:
             return True
 
         return df[df.apply(is_data_row, axis=1)]
+
+    def _set_df_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
+        # Infer and set appropriate data types for each colum
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            df = df.apply(pd.to_numeric, errors="ignore")
+        df = df.convert_dtypes()
+
+        return df
+
+    def _fill_df_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
+        # Fill missing values: numeric columns with 0, others with empty strings
+        for numeric_column in df.select_dtypes(include=np.number).columns:
+            df[numeric_column] = df[numeric_column].fillna(0)
+        df = df.fillna("")
+
+        return df
 
     def _to_snake_case(self, text: str) -> str:
         return text.strip().replace(" ", "_").replace("/", "_").lower()
