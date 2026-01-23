@@ -74,8 +74,6 @@ class SportsRefScraper:
 
         target_table = tables[table_index]
 
-        urls_data = self._extract_table_urls(target_table)
-
         df = pd.read_html(StringIO(str(target_table)))[0]
 
         # Handle multi-level column headers by flattening and combining headers
@@ -94,16 +92,10 @@ class SportsRefScraper:
 
         df.columns = [self._to_snake_case(col) for col in df.columns]
 
-        # Add temporary column to track original row indices before filtering
-        df["_original_row_idx"] = range(len(df))
+        # Add URL columns before filtering rows to ensure index alignment
+        self._add_url_columns(df, target_table)
 
         df = self._filter_non_data_rows(df, original_columns)
-
-        # Add URL columns after filtering rows (before reset_index)
-        df = self._add_url_columns(df, urls_data)
-
-        # Remove temporary tracking column and reset index
-        df = df.drop(columns=["_original_row_idx"])
         df = df.reset_index(drop=True)
 
         df = self._set_df_dtypes(df)
@@ -111,69 +103,67 @@ class SportsRefScraper:
 
         return df
 
-    def _extract_table_urls(self, table: Tag) -> dict[int, dict[int, str]]:
-        urls_data: dict[int, dict[int, str]] = {}
-
-        # Find all rows in tbody (data rows)
-        tbody = table.find("tbody")
+    def _add_url_columns(self, df: pd.DataFrame, table_soup: Tag) -> None:
+        # Extracts URLs from the HTML table and inserts them as new columns in the DataFrame
+        tbody = table_soup.find("tbody")
         if not tbody or not isinstance(tbody, Tag):
-            return urls_data
+            return
 
-        rows = tbody.find_all("tr")
+        rows = tbody.find_all("tr", recursive=False)
 
-        for row_idx, row in enumerate(rows):
+        if len(rows) != len(df):
+            print(
+                f"Warning: Row count mismatch (DataFrame: {len(df)}, HTML: {len(rows)}). "
+                + "Skipping URL extraction to avoid misalignment."
+            )
+            return
+
+        # Extract URLs into a grid (list of lists) matching the DataFrame structure
+        # We handle colspan to align with pandas' expansion of columns
+        urls_grid: list[list[str]] = []
+        for row in rows:
+            row_urls: list[str] = []
             cells = row.find_all(["td", "th"])
-
-            for col_idx, cell in enumerate(cells):
-                # Find first <a> tag with href in this cell
+            for cell in cells:
+                colspan = int(cell.get("colspan", 1))
                 link = cell.find("a", href=True)
-                if link:
-                    if row_idx not in urls_data:
-                        urls_data[row_idx] = {}
-                    urls_data[row_idx][col_idx] = link["href"]
+                url = link["href"] if link else ""
 
-        return urls_data
+                # Replicate the URL (or empty string) for each spanned column
+                for _ in range(colspan):
+                    row_urls.append(url)
+            urls_grid.append(row_urls)
 
-    def _add_url_columns(
-        self, df: pd.DataFrame, urls_data: dict[int, dict[int, str]]
-    ) -> pd.DataFrame:
-        if not urls_data:
-            return df
+        # Identify which columns have at least one URL
+        new_columns: dict[str, tuple[int, list[str]]] = {}
+        num_cols = len(df.columns)
 
-        # Determine which columns have URLs
-        columns_with_urls: set[int] = set[int]()
-        for row_urls in urls_data.values():
-            columns_with_urls.update(row_urls.keys())
+        for col_idx in range(num_cols):
+            col_urls: list[str] = []
+            has_url = False
 
-        if not columns_with_urls:
-            return df
-
-        # Exclude the temporary tracking column from URL processing
-        columns_with_urls = {idx for idx in columns_with_urls if idx < len(df.columns) - 1}
-
-        # Add URL columns
-        for col_idx in sorted(columns_with_urls):
-            col_name = df.columns[col_idx]
-            url_col_name = f"{col_name}_url"
-
-            # Create URL column with data aligned to filtered rows using _original_row_idx
-            url_values: list[str] = []
-            for _, row in df.iterrows():
-                original_row_idx = int(row["_original_row_idx"])
-                if original_row_idx in urls_data:
-                    url = urls_data[original_row_idx].get(col_idx, "")
+            for row_url_list in urls_grid:
+                if col_idx < len(row_url_list):
+                    url = row_url_list[col_idx]
                 else:
                     url = ""
-                url_values.append(url)
 
-            # Insert URL column right after the data column
-            col_position = df.columns.get_loc(col_name)
-            insert_position = (
-                int(col_position) + 1 if isinstance(col_position, (int, np.integer)) else 0
-            )
-            df.insert(insert_position, url_col_name, url_values)
+                col_urls.append(url)
+                if url:
+                    has_url = True
 
-        return df
+            if has_url:
+                col_name = df.columns[col_idx]
+                new_columns[f"{col_name}_url"] = (col_idx, col_urls)
+
+        # Insert new URL columns in order of original column index, maintaining an offset for previous insertions
+        offset = 0
+        sorted_insertions = sorted(new_columns.items(), key=lambda x: x[1][0])
+
+        for url_col_name, (original_col_idx, url_values) in sorted_insertions:
+            insert_pos = original_col_idx + 1 + offset
+            df.insert(insert_pos, url_col_name, url_values)
+            offset += 1
 
     def _filter_non_data_rows(self, df: pd.DataFrame, original_columns: set[str]) -> pd.DataFrame:
         first_col = df.columns[0]
