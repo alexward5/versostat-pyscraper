@@ -1,4 +1,5 @@
 from src.classes.SportsRefScraper import SportsRefScraper
+from src.utils.df_utils import inspect_df
 
 
 def main() -> None:
@@ -12,7 +13,7 @@ def main() -> None:
 
     df = scraper.scrape_table(url, table_index=table_index)
 
-    scraper.inspect_df(df)
+    inspect_df(df)
 
 
 if __name__ == "__main__":
