@@ -147,7 +147,8 @@ class SportsRefScraper:
                     continue
 
                 numeric_col = pd.to_numeric(df[col], errors="coerce")
-                if numeric_col.notna().sum() >= len(df) * 0.5:
+                # Only convert if all non-null values successfully converted to numeric
+                if df[col].notna().sum() == numeric_col.notna().sum():
                     df[col] = numeric_col
 
         df = df.convert_dtypes()
