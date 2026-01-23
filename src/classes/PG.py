@@ -1,164 +1,165 @@
-from typing import Any, Optional
+import logging
+from contextlib import contextmanager
+from typing import Any, Iterator, Optional
 
 import psycopg2
 import psycopg2.extras
 from psycopg2 import sql
 
+logger = logging.getLogger(__name__)
+
 
 class PG:
-    def __init__(self, dbname: str, user: str):
-        self.conn = psycopg2.connect(f"dbname={dbname} user={user}")
+    def __init__(self, dbname: str, user: str, host: str = "localhost", port: int = 5432) -> None:
+        self.conn: Any = psycopg2.connect(dbname=dbname, user=user, host=host, port=port)
 
-    def __del__(self):
-        self.conn.close()
+    def close(self) -> None:
+        if self.conn and not self.conn.closed:
+            self.conn.close()
 
-    def drop_schema(self, schema_name: str):
-        with self.conn.cursor() as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name)),
-            )
-
+    @contextmanager
+    def _cursor(self, dict_cursor: bool = False) -> Iterator[Any]:
+        """Context manager for cursor with automatic commit/rollback."""
+        cursor_factory = psycopg2.extras.RealDictCursor if dict_cursor else None
+        cur: Any = self.conn.cursor(cursor_factory=cursor_factory)
+        try:
+            yield cur
             self.conn.commit()
-            print(f"Dropped schema: {schema_name}")
+        except Exception:
+            self.conn.rollback()
+            raise
+        finally:
+            cur.close()
 
-    def create_schema(self, schema_name: str):
-        with self.conn.cursor() as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema_name)),
+    def drop_schema(self, schema_name: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name))
             )
+        logger.info("Dropped schema: %s", schema_name)
 
-            self.conn.commit()
-            print(f"Created schema: {schema_name}")
-
-    def drop_table(self, schema: str, table_name: str):
-        with self.conn.cursor() as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("DROP TABLE IF EXISTS {schema}.{table_name} CASCADE").format(
-                    schema=sql.Identifier(schema),
-                    table_name=sql.Identifier(table_name),
-                ),
+    def create_schema(self, schema_name: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema_name))
             )
+        logger.info("Created schema: %s", schema_name)
 
-            self.conn.commit()
-            print(f"Dropped table: {table_name}")
-
-    def create_table(self, schema: str, table_name: str, columns: list[Any]):
-        with self.conn.cursor() as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("CREATE TABLE IF NOT EXISTS {schema}.{table_name} ({columns})").format(
-                    schema=sql.Identifier(schema),
-                    table_name=sql.Identifier(table_name),
-                    columns=sql.SQL(",".join(columns)),
-                ),
+    def drop_table(self, schema: str, table_name: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("DROP TABLE IF EXISTS {}.{} CASCADE").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(table_name),
+                )
             )
+        logger.info("Dropped table: %s.%s", schema, table_name)
 
-            self.conn.commit()
-            print(f"Created table: {table_name}")
+    def create_table(self, schema: str, table_name: str, columns: list[str]) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("CREATE TABLE IF NOT EXISTS {}.{} ({})").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(table_name),
+                    sql.SQL(", ".join(columns)),
+                )
+            )
+        logger.info("Created table: %s.%s", schema, table_name)
 
     def insert_row(
         self,
         schema: str,
         table_name: str,
-        column_names: list[Any],
+        column_names: list[str],
         row_values: list[Any],
         update_on: Optional[str] = None,
-    ):
-        with self.conn.cursor() as cur:
-            column_names_joined = ",".join(column_names)
-            row_values_joined = ", ".join(f"'{val}'" for val in row_values)
+    ) -> None:
+        placeholders = sql.SQL(", ").join(sql.Placeholder() for _ in row_values)
+        columns = sql.SQL(", ").join(sql.Identifier(col) for col in column_names)
 
-            if update_on:
-                on_conflict = f"ON CONFLICT ({update_on}) DO UPDATE SET {', '.join([f'{col} = EXCLUDED.{col}' for col in column_names if col != update_on])}"  # noqa
-
-            else:
-                on_conflict = "ON CONFLICT DO NOTHING"
-
-            cur.execute(  # type: ignore
-                sql.SQL(
-                    "INSERT INTO {schema}.{table_name}({column_names}) VALUES ({row_values}) {on_conflict}"  # noqa
-                ).format(
-                    schema=sql.Identifier(schema),
-                    table_name=sql.Identifier(table_name),
-                    column_names=sql.SQL(column_names_joined),
-                    row_values=sql.SQL(row_values_joined),  # type: ignore
-                    on_conflict=sql.SQL(on_conflict),
+        if update_on:
+            update_cols = [col for col in column_names if col != update_on]
+            on_conflict = sql.SQL("ON CONFLICT ({}) DO UPDATE SET {}").format(
+                sql.Identifier(update_on),
+                sql.SQL(", ").join(
+                    sql.SQL("{} = EXCLUDED.{}").format(sql.Identifier(col), sql.Identifier(col))
+                    for col in update_cols
                 ),
             )
+        else:
+            on_conflict = sql.SQL("ON CONFLICT DO NOTHING")
 
-            self.conn.commit()
+        query = sql.SQL("INSERT INTO {}.{} ({}) VALUES ({}) {}").format(
+            sql.Identifier(schema),
+            sql.Identifier(table_name),
+            columns,
+            placeholders,
+            on_conflict,
+        )
+
+        with self._cursor() as cur:
+            cur.execute(query, row_values)
 
     def query_table(
         self,
         schema: str,
         table_name: str,
         columns: Optional[list[str]] = None,
-        where_clause: Optional[str] = "",
-    ) -> list[Any]:
-        query_columns = "*"
+        where_clause: Optional[str] = None,
+        where_params: Optional[list[Any]] = None,
+    ) -> list[dict[str, Any]]:
         if columns:
-            query_columns = ",".join(columns)
+            cols = sql.SQL(", ").join(sql.Identifier(c) for c in columns)
+        else:
+            cols = sql.SQL("*")
 
-        with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("SELECT {query_columns} FROM {schema}.{table_name} {where_clause}").format(
-                    query_columns=sql.SQL(query_columns),
-                    schema=sql.Identifier(schema),
-                    table_name=sql.Identifier(table_name),
-                    where_clause=sql.SQL(where_clause),  # type: ignore
-                ),
+        query = sql.SQL("SELECT {} FROM {}.{}").format(
+            cols,
+            sql.Identifier(schema),
+            sql.Identifier(table_name),
+        )
+
+        if where_clause:
+            query = sql.SQL("{} WHERE {}").format(query, sql.SQL(where_clause))
+
+        with self._cursor(dict_cursor=True) as cur:
+            cur.execute(query, where_params or [])
+            result: list[dict[str, Any]] = cur.fetchall()
+            return result
+
+    def create_view(self, schema: str, view_name: str, view_query: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("DROP VIEW IF EXISTS {}.{} CASCADE").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(view_name),
+                )
             )
-
-            rows = cur.fetchall()
-
-        return rows
-
-    def create_view(
-        self,
-        schema: str,
-        view_name: str,
-        view_query: Any,
-    ) -> None:
-        with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("DROP VIEW IF EXISTS {schema}.{view_name} CASCADE").format(
-                    schema=sql.Identifier(schema),
-                    view_name=sql.Identifier(view_name),
-                ),
+            cur.execute(
+                sql.SQL("CREATE VIEW {}.{} AS {}").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(view_name),
+                    sql.SQL(view_query),
+                )
             )
+        logger.info("Created view: %s.%s", schema, view_name)
 
-            cur.execute(  # type: ignore
-                sql.SQL("CREATE OR REPLACE VIEW {schema}.{view_name} AS {view_query}").format(
-                    schema=sql.Identifier(schema),
-                    view_name=sql.Identifier(view_name),
-                    view_query=sql.SQL(view_query),
-                ),
+    def create_materialized_view(self, schema: str, view_name: str, view_query: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("DROP MATERIALIZED VIEW IF EXISTS {}.{} CASCADE").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(view_name),
+                )
             )
-
-            self.conn.commit()
-
-    def create_materialized_view(
-        self,
-        schema: str,
-        view_name: str,
-        view_query: Any,
-    ) -> None:
-        with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("DROP MATERIALIZED VIEW IF EXISTS {schema}.{view_name} CASCADE").format(
-                    schema=sql.Identifier(schema),
-                    view_name=sql.Identifier(view_name),
-                ),
+            cur.execute(
+                sql.SQL("CREATE MATERIALIZED VIEW {}.{} AS {}").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(view_name),
+                    sql.SQL(view_query),
+                )
             )
-
-            cur.execute(  # type: ignore
-                sql.SQL("CREATE MATERIALIZED VIEW {schema}.{view_name} AS {view_query}").format(
-                    schema=sql.Identifier(schema),
-                    view_name=sql.Identifier(view_name),
-                    view_query=sql.SQL(view_query),
-                ),
-            )
-
-            self.conn.commit()
+        logger.info("Created materialized view: %s.%s", schema, view_name)
 
     def create_index(
         self,
@@ -167,24 +168,21 @@ class PG:
         index_name: str,
         columns: list[str],
     ) -> None:
-        with self.conn.cursor() as cur:
-            cur.execute(  # type: ignore
-                sql.SQL("DROP INDEX IF EXISTS {schema}.{index_name}").format(
-                    schema=sql.Identifier(schema),
-                    index_name=sql.Identifier(index_name),
-                ),
+        columns_sql = sql.SQL(", ").join(sql.Identifier(col) for col in columns)
+
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("DROP INDEX IF EXISTS {}.{}").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(index_name),
+                )
             )
-
-            columns_identifiers = sql.SQL(", ").join(sql.Identifier(col) for col in columns)
-
-            cur.execute(  # type: ignore
-                sql.SQL("CREATE INDEX {index_name} ON {schema}.{table_name} ({columns})").format(
-                    index_name=sql.Identifier(index_name),
-                    schema=sql.Identifier(schema),
-                    table_name=sql.Identifier(table_name),
-                    columns=columns_identifiers,
-                ),
+            cur.execute(
+                sql.SQL("CREATE INDEX {} ON {}.{} ({})").format(
+                    sql.Identifier(index_name),
+                    sql.Identifier(schema),
+                    sql.Identifier(table_name),
+                    columns_sql,
+                )
             )
-
-            self.conn.commit()
-            print(f"Created index: {index_name}")
+        logger.info("Created index: %s on %s.%s", index_name, schema, table_name)
