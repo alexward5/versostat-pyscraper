@@ -1,0 +1,11 @@
+# packages
+python-dotenv
+beautifulsoup4
+zenrows
+pandas
+
+# dev-packages
+black
+pyright
+types-beautifulsoup4
+pandas-stubs
