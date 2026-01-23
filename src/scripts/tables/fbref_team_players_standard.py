@@ -19,7 +19,7 @@ class TeamData(TypedDict):
 BASE_URL = "https://fbref.com"
 PREMIER_LEAGUE_URL = "https://fbref.com/en/comps/9/Premier-League-Stats"
 TABLE_NAME = "fbref_team_players_standard"
-PRIMARY_KEY_COLUMN = "uuid"
+PRIMARY_KEY_COLUMN = "fbref_player_uuid"
 
 
 def main(schema: str) -> None:
