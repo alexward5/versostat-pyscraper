@@ -9,7 +9,11 @@ from bs4 import BeautifulSoup, Tag
 from dotenv import load_dotenv
 from zenrows import ZenRowsClient  # type: ignore
 
+from ..utils.logger import setup_logger
+
 load_dotenv(".env.local")
+
+logger = setup_logger(__name__)
 
 
 class SportsRefScraper:
@@ -42,14 +46,14 @@ class SportsRefScraper:
                 if response.status_code == 200 and "table" in response.text:
                     return response.text
 
-                print(
-                    f"Failed: status={response.status_code}, has_table={'table' in response.text}"
+                logger.warning(
+                    "Failed: status=%s, has_table=%s", response.status_code, "table" in response.text
                 )
             except Exception as e:
-                print(f"Error while retrieving page content: {e}")
+                logger.error("Error while retrieving page content: %s", e)
 
             sleep_time = 30 * (2**attempt)
-            print(f"Retry {attempt + 1}/{retries}. Sleeping for {sleep_time} seconds...")
+            logger.info("Retry %s/%s. Sleeping for %s seconds...", attempt + 1, retries, sleep_time)
             time.sleep(sleep_time)
 
         raise ValueError("Failed to fetch HTML after all retries")
@@ -58,7 +62,7 @@ class SportsRefScraper:
         elapsed = time.time() - self._last_request_time
         if elapsed < self.RATE_LIMIT_SECONDS:
             wait_time = self.RATE_LIMIT_SECONDS - elapsed
-            print(f"Rate limit: waiting {wait_time:.1f}s before next request...")
+            logger.info("Rate limit: waiting %.1fs before next request...", wait_time)
             time.sleep(wait_time)
 
     def _parse_table(self, html: str, table_index: int) -> pd.DataFrame:
@@ -105,8 +109,10 @@ class SportsRefScraper:
         # Handle mismatch by padding with empty URL rows if DataFrame has more rows
         # This happens when pandas includes rows that will be filtered later
         if len(rows) > len(df):
-            print(
-                f"Warning: More HTML rows ({len(rows)}) than DataFrame rows ({len(df)}). Skipping URL extraction."
+            logger.warning(
+                "More HTML rows (%s) than DataFrame rows (%s). Skipping URL extraction.",
+                len(rows),
+                len(df),
             )
             return
 

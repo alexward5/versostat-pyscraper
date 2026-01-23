@@ -1,5 +1,8 @@
 from src.classes.SportsRefScraper import SportsRefScraper
 from src.utils.df_utils import inspect_df
+from src.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def main() -> None:
@@ -8,8 +11,8 @@ def main() -> None:
     url = "https://fbref.com/en/comps/9/Premier-League-Stats"
     table_index = 0
 
-    print(f"Scraping table {table_index} from: {url}")
-    print("-" * 80)
+    logger.info("Scraping table %s from: %s", table_index, url)
+    logger.info("-" * 80)
 
     df = scraper.scrape_table(url, table_index=table_index)
 

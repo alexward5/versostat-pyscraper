@@ -1,4 +1,3 @@
-import logging
 import os
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
@@ -8,9 +7,11 @@ import psycopg2.extras
 from dotenv import load_dotenv
 from psycopg2 import sql
 
+from ..utils.logger import setup_logger
+
 load_dotenv(".env.local")
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 class PostgresClient:

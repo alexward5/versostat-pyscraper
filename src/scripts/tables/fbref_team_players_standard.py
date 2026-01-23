@@ -1,5 +1,4 @@
 import argparse
-import logging
 from typing import Any, TypedDict
 
 from ...classes.PostgresClient import PostgresClient
@@ -7,12 +6,9 @@ from ...classes.SportsRefScraper import SportsRefScraper
 from ...utils.df_utils.add_id_column import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.df_utils.sanitize_columns import sanitize_column_names
+from ...utils.logger import setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+logger = setup_logger(__name__)
 
 
 class TeamData(TypedDict):
@@ -43,14 +39,14 @@ def main(schema: str) -> None:
         if row["squad_url"]
     ]
 
-    print(f"Processing {len(teams_data)} teams")
+    logger.info("Processing %s teams", len(teams_data))
 
     table_created = False
     total_rows = 0
     reference_columns = None
 
     for team in teams_data:
-        print(f"\nProcessing {team['squad']}...")
+        logger.info_with_newline("Processing %s...", team["squad"])
 
         players_df = scraper.scrape_table(team["url"], table_index=0)
         players_df = sanitize_column_names(players_df)
@@ -67,7 +63,9 @@ def main(schema: str) -> None:
         # Use column names from first table for all subsequent tables
         if reference_columns is None:
             reference_columns = list[str](players_df.columns)
-            print(f"Reference columns set from {team['squad']}: {len(reference_columns)} columns")
+            logger.info(
+                "Reference columns set from %s: %s columns", team["squad"], len(reference_columns)
+            )
         else:
             # Ensure column count matches reference
             if len(players_df.columns) != len(reference_columns):
@@ -96,14 +94,14 @@ def main(schema: str) -> None:
             )
 
         total_rows += len(players_df)
-        print(f"Inserted {len(players_df)} rows")
+        logger.info("Inserted %s rows", len(players_df))
 
     db.close()
 
-    print(f"\n{'='*60}")
-    print(f"Completed: {len(teams_data)} teams, {total_rows} total rows")
-    print(f"Table: {schema}.{TABLE_NAME}")
-    print(f"{'='*60}")
+    logger.info_with_newline("=" * 60)
+    logger.info("Completed: %s teams, %s total rows", len(teams_data), total_rows)
+    logger.info("Table: %s.%s", schema, TABLE_NAME)
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":
