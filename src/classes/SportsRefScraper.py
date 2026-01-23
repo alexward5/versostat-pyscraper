@@ -137,12 +137,8 @@ class SportsRefScraper:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=FutureWarning)
             for col in df.columns:
-                is_empty = (
-                    df[col].isna().all() or (df[col].fillna("").astype(str).str.strip() == "").all()
-                )
-
-                # Keep empty columns as string type
-                if is_empty:
+                # Keep completely empty columns as string type
+                if df[col].isna().all():
                     df[col] = ""
                     continue
 
