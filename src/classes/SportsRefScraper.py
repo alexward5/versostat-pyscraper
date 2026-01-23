@@ -48,7 +48,7 @@ class SportsRefScraper:
             except Exception as e:
                 print(f"Error while retrieving page content: {e}")
 
-            sleep_time = 10 * (attempt + 1)
+            sleep_time = 30 * (2**attempt)
             print(f"Retry {attempt + 1}/{retries}. Sleeping for {sleep_time} seconds...")
             time.sleep(sleep_time)
 
