@@ -47,6 +47,7 @@ def main(schema: str) -> None:
 
     table_created = False
     total_rows = 0
+    reference_columns = None
 
     for team in teams_data:
         print(f"\nProcessing {team['squad']}...")
@@ -62,6 +63,23 @@ def main(schema: str) -> None:
         players_df = players_df[
             [PRIMARY_KEY_COLUMN] + [col for col in players_df.columns if col != PRIMARY_KEY_COLUMN]
         ]
+
+        # Use column names from first table for all subsequent tables
+        if reference_columns is None:
+            reference_columns = list[str](players_df.columns)
+            print(f"Reference columns set from {team['squad']}: {len(reference_columns)} columns")
+        else:
+            # Ensure column count matches reference
+            if len(players_df.columns) != len(reference_columns):
+                raise ValueError(
+                    (
+                        f"Column count mismatch for {team['squad']}: "
+                        f"expected {len(reference_columns)} columns but got {len(players_df.columns)}. "
+                        f"Current columns: {list(players_df.columns)}"
+                    )
+                )
+            # Use reference column names instead of scraped column names
+            players_df.columns = reference_columns
 
         if not table_created:
             columns = build_table_columns_from_df(players_df, PRIMARY_KEY_COLUMN)
