@@ -32,7 +32,7 @@ class SportsRefScraper:
     def _fetch_html(self, url: str, retries: int = 3) -> str:
         for attempt in range(retries):
             try:
-                response = self._client.get(url, params=self._zenrows_params)
+                response = self._client.get(url, params=self._zenrows_params)  # type: ignore
 
                 if response.status_code != 200:
                     print(f"Failed with status {response.status_code}. Retrying...")
@@ -53,7 +53,7 @@ class SportsRefScraper:
 
     def _parse_table(self, html: str, table_index: int) -> pd.DataFrame:
         soup = BeautifulSoup(html, "lxml")
-        tables = soup.select("table.stats_table")
+        tables = soup.select("table.stats_table")  # type: ignore
 
         if not tables:
             raise ValueError("No stats tables found on page")
@@ -87,7 +87,7 @@ class SportsRefScraper:
 
         return df
 
-    def _filter_non_data_rows(self, df: pd.DataFrame, original_columns: set) -> pd.DataFrame:
+    def _filter_non_data_rows(self, df: pd.DataFrame, original_columns: set[str]) -> pd.DataFrame:
         first_col = df.columns[0]
 
         def is_data_row(row: pd.Series) -> bool:
