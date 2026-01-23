@@ -48,7 +48,26 @@ class PostgresClient:
         finally:
             cur.close()
 
+    def schema_exists(self, schema_name: str) -> bool:
+        with self._cursor() as cur:
+            cur.execute(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = %s)",
+                (schema_name,),
+            )
+            return bool(cur.fetchone()[0])
+
+    def table_exists(self, schema: str, table_name: str) -> bool:
+        with self._cursor() as cur:
+            cur.execute(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = %s)",
+                (schema, table_name),
+            )
+            return bool(cur.fetchone()[0])
+
     def drop_schema(self, schema_name: str) -> None:
+        if not self.schema_exists(schema_name):
+            return
+
         with self._cursor() as cur:
             cur.execute(
                 sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema_name))
@@ -56,6 +75,9 @@ class PostgresClient:
         logger.info("Dropped schema: %s", schema_name)
 
     def create_schema(self, schema_name: str) -> None:
+        if self.schema_exists(schema_name):
+            return
+
         with self._cursor() as cur:
             cur.execute(
                 sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema_name))
@@ -63,6 +85,9 @@ class PostgresClient:
         logger.info("Created schema: %s", schema_name)
 
     def drop_table(self, schema: str, table_name: str) -> None:
+        if not self.table_exists(schema, table_name):
+            return
+
         with self._cursor() as cur:
             cur.execute(
                 sql.SQL("DROP TABLE IF EXISTS {}.{} CASCADE").format(
@@ -73,6 +98,9 @@ class PostgresClient:
         logger.info("Dropped table: %s.%s", schema, table_name)
 
     def create_table(self, schema: str, table_name: str, columns: list[str]) -> None:
+        if self.table_exists(schema, table_name):
+            return
+
         with self._cursor() as cur:
             cur.execute(
                 sql.SQL("CREATE TABLE IF NOT EXISTS {}.{} ({})").format(
