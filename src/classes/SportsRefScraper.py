@@ -5,7 +5,7 @@ from time import sleep
 import pandas as pd
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from zenrows import ZenRowsClient
+from zenrows import ZenRowsClient  # type: ignore
 
 load_dotenv(".env.local")
 
@@ -55,7 +55,6 @@ class SportsRefScraper:
 
         if not tables:
             raise ValueError("No stats tables found on page")
-
         if table_index >= len(tables):
             raise IndexError(f"Table index {table_index} out of range (found {len(tables)} tables)")
 
@@ -80,7 +79,6 @@ class SportsRefScraper:
         df.columns = [self._to_snake_case(col) for col in df.columns]
 
         df = self._filter_non_data_rows(df, original_columns)
-
         df = df.reset_index(drop=True)
 
         return df
