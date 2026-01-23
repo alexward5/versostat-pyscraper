@@ -150,10 +150,3 @@ class SportsRefScraper:
 
     def _to_snake_case(self, text: str) -> str:
         return text.strip().replace(" ", "_").replace("/", "_").lower()
-
-    def inspect_df(self, df: pd.DataFrame) -> None:
-        print(f"\nDataFrame shape: {df.shape}")
-        print(f"Columns ({len(df.columns)}): {list(df.columns)}")
-        print(f"\nData types:\n{df.dtypes}")
-        print(f"\nFirst 5 rows:\n{df.head()}")
-        print(f"\nLast 5 rows:\n{df.tail()}")
