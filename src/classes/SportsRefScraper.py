@@ -141,10 +141,25 @@ class SportsRefScraper:
                 offset += 1
 
     def _filter_non_data_rows(self, df: pd.DataFrame, original_columns: set[str]) -> pd.DataFrame:
-        first_col = df.columns[0]
-        first_vals = df[first_col].fillna("").astype(str)
-        mask = ~first_vals.str.lower().str.contains("total") & ~first_vals.isin(original_columns)
-        return df[mask]
+        # Filter out rows where ANY cell contains a header value or "total"
+        is_header_row = pd.Series([False] * len(df), index=df.index)
+
+        # Only check non-URL columns for header values
+        non_url_columns = [col for col in df.columns if not col.endswith("_url")]
+
+        # Check for "total" in any non-URL column (case-insensitive)
+        for col in non_url_columns:
+            col_vals = df[col].fillna("").astype(str).str.strip()
+            is_header_row |= col_vals.str.lower().str.contains("total", regex=False)
+
+        # Filter duplicate header rows, which sometimes appear in the middle of tables
+        if len(non_url_columns) > 0:
+            first_col = non_url_columns[0]
+            first_col_vals = df[first_col].fillna("").astype(str).str.strip()
+            # If first column contains any original column name, it's likely a header row
+            is_header_row |= first_col_vals.isin(original_columns)
+
+        return df[~is_header_row]
 
     def _clean_df_values(self, df: pd.DataFrame) -> pd.DataFrame:
         # Convert columns to numeric where appropriate
