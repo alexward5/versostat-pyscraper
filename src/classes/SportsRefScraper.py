@@ -137,6 +137,15 @@ class SportsRefScraper:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=FutureWarning)
             for col in df.columns:
+                is_empty = (
+                    df[col].isna().all() or (df[col].fillna("").astype(str).str.strip() == "").all()
+                )
+
+                # Keep empty columns as string type
+                if is_empty:
+                    df[col] = ""
+                    continue
+
                 numeric_col = pd.to_numeric(df[col], errors="coerce")
                 if numeric_col.notna().sum() >= len(df) * 0.5:
                     df[col] = numeric_col
