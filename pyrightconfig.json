@@ -1,23 +1,15 @@
 {
   "typeCheckingMode": "strict",
   "pythonVersion": "3.13",
-  "stubPath": "typings",
-  "include": [
-    "src",
-    "index.py"
-  ],
-  "exclude": [
-    "**/__pycache__",
-    "**/.venv",
-  ],
-	"reportUntypedFunctionDecorator": "error",
-	"reportUntypedBaseClass": "error",
-	"reportImplicitOverride": "error",
-	"reportImplicitStringConcatenation": "error",
-	"reportMissingParameterType": "error",
-	"reportMissingTypeStubs": "warning",
-	"reportUnusedVariable": "warning",
-	"reportUnnecessaryIsInstance": "warning",
-	"reportUnnecessaryComparison": "warning"
+  "include": ["src", "index.py"],
+  "exclude": ["**/__pycache__", "**/.venv"],
+  "reportUntypedFunctionDecorator": "error",
+  "reportUntypedBaseClass": "error",
+  "reportImplicitOverride": "error",
+  "reportImplicitStringConcatenation": "error",
+  "reportMissingParameterType": "error",
+  "reportMissingTypeStubs": "warning",
+  "reportUnusedVariable": "warning",
+  "reportUnnecessaryIsInstance": "warning",
+  "reportUnnecessaryComparison": "warning"
 }
-
