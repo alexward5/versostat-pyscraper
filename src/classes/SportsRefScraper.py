@@ -77,9 +77,9 @@ class SportsRefScraper:
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = [
                 "_".join(
-                    str(lvl)
-                    for lvl in col
-                    if str(lvl).strip() and not str(lvl).startswith("Unnamed")
+                    str(level)
+                    for level in col
+                    if str(level).strip() and not str(level).startswith("Unnamed")
                 )
                 for col in df.columns
             ]
