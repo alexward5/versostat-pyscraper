@@ -21,8 +21,8 @@ class SportsRefScraper:
             raise ValueError("ZENROWS_API_KEY not found in environment variables")
         self._client = ZenRowsClient(api_key)
         self._zenrows_params = {
+            "js_render": "true",
             "antibot": "true",
-            "wait_for": "table.stats_table",
             "premium_proxy": "true",
             "proxy_country": "us",
         }
@@ -36,7 +36,7 @@ class SportsRefScraper:
         for attempt in range(retries):
             try:
                 self._wait_for_rate_limit()
-                response = self._client.get(url, params=self._zenrows_params)  # type: ignore
+                response = self._client.get(url, params=self._zenrows_params, timeout=60)  # type: ignore
                 self._last_request_time = time.time()
 
                 if response.status_code == 200 and "table" in response.text:
@@ -101,7 +101,7 @@ class SportsRefScraper:
             return
 
         rows = tbody.find_all("tr", recursive=False)
-        
+
         # Handle mismatch by padding with empty URL rows if DataFrame has more rows
         # This happens when pandas includes rows that will be filtered later
         if len(rows) > len(df):
@@ -109,7 +109,7 @@ class SportsRefScraper:
                 f"Warning: More HTML rows ({len(rows)}) than DataFrame rows ({len(df)}). Skipping URL extraction."
             )
             return
-        
+
         # Extract URLs into grid, handling colspan
         urls_grid: list[list[str]] = []
         for row in rows:
@@ -119,7 +119,7 @@ class SportsRefScraper:
                 url = link["href"] if link else ""
                 row_urls.extend([url] * int(cell.get("colspan", 1)))
             urls_grid.append(row_urls)
-        
+
         # Pad with empty rows if DataFrame has more rows (for rows that will be filtered later)
         while len(urls_grid) < len(df):
             urls_grid.append([""] * len(urls_grid[0]) if urls_grid else [])
