@@ -1,17 +1,36 @@
 import logging
+import os
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
 
 import psycopg2
 import psycopg2.extras
+from dotenv import load_dotenv
 from psycopg2 import sql
+
+# Load environment variables from .env.local
+load_dotenv(".env.local")
 
 logger = logging.getLogger(__name__)
 
 
 class PG:
-    def __init__(self, dbname: str, user: str, host: str = "localhost", port: int = 5432) -> None:
-        self.conn: Any = psycopg2.connect(dbname=dbname, user=user, host=host, port=port)
+    def __init__(self) -> None:
+        # Load all credentials from environment variables
+        self.dbname = os.getenv("DB_NAME")
+        self.user = os.getenv("DB_USER")
+        self.host = os.getenv("DB_HOST")
+        self.port = os.getenv("DB_PORT")
+
+        if not self.dbname or not self.user or not self.host or not self.port:
+            raise ValueError("Database credentials not found in environment variables")
+
+        self.conn: Any = psycopg2.connect(
+            dbname=self.dbname,
+            user=self.user,
+            host=self.host,
+            port=self.port,
+        )
 
     def close(self) -> None:
         if self.conn and not self.conn.closed:
