@@ -8,7 +8,6 @@ import psycopg2.extras
 from dotenv import load_dotenv
 from psycopg2 import sql
 
-# Load environment variables from .env.local
 load_dotenv(".env.local")
 
 logger = logging.getLogger(__name__)
@@ -16,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 class PG:
     def __init__(self) -> None:
-        # Load all credentials from environment variables
         self.dbname = os.getenv("DB_NAME")
         self.user = os.getenv("DB_USER")
         self.host = os.getenv("DB_HOST")
