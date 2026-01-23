@@ -10,11 +10,14 @@
     "**/__pycache__",
     "**/.venv",
   ],
-	"reportMissingTypeStubs": "warning",
 	"reportUntypedFunctionDecorator": "error",
 	"reportUntypedBaseClass": "error",
 	"reportImplicitOverride": "error",
 	"reportImplicitStringConcatenation": "error",
-	"reportMissingParameterType": "error"
+	"reportMissingParameterType": "error",
+	"reportMissingTypeStubs": "warning",
+	"reportUnusedVariable": "warning",
+	"reportUnnecessaryIsInstance": "warning",
+	"reportUnnecessaryComparison": "warning"
 }
 
