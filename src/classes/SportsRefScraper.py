@@ -101,12 +101,15 @@ class SportsRefScraper:
             return
 
         rows = tbody.find_all("tr", recursive=False)
-        if len(rows) != len(df):
+        
+        # Handle mismatch by padding with empty URL rows if DataFrame has more rows
+        # This happens when pandas includes rows that will be filtered later
+        if len(rows) > len(df):
             print(
-                f"Warning: Row count mismatch (DataFrame: {len(df)}, HTML: {len(rows)}). Skipping URL extraction."
+                f"Warning: More HTML rows ({len(rows)}) than DataFrame rows ({len(df)}). Skipping URL extraction."
             )
             return
-
+        
         # Extract URLs into grid, handling colspan
         urls_grid: list[list[str]] = []
         for row in rows:
@@ -116,6 +119,10 @@ class SportsRefScraper:
                 url = link["href"] if link else ""
                 row_urls.extend([url] * int(cell.get("colspan", 1)))
             urls_grid.append(row_urls)
+        
+        # Pad with empty rows if DataFrame has more rows (for rows that will be filtered later)
+        while len(urls_grid) < len(df):
+            urls_grid.append([""] * len(urls_grid[0]) if urls_grid else [])
 
         # Insert URL columns for columns that have at least one URL
         original_cols = list(df.columns)
