@@ -13,7 +13,7 @@ load_dotenv(".env.local")
 logger = logging.getLogger(__name__)
 
 
-class PG:
+class PostgresClient:
     def __init__(self) -> None:
         self.dbname = os.getenv("DB_NAME")
         self.user = os.getenv("DB_USER")
