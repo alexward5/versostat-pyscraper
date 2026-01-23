@@ -8,6 +8,7 @@ def transform_column(
     column: str,
     transform_fn: Callable[[Any], Any],
 ) -> pd.DataFrame:
+    """Apply a transformation function to every cell in a column"""
     df[column] = df[column].apply(transform_fn)
 
     return df
