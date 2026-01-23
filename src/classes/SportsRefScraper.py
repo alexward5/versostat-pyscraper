@@ -1,7 +1,7 @@
 import os
+import time
 import warnings
 from io import StringIO
-from time import sleep
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,7 @@ class SportsRefScraper:
             "premium_proxy": "true",
             "proxy_country": "us",
         }
+        self._last_request_time: float = 0
 
     def scrape_table(self, url: str, table_index: int = 0) -> pd.DataFrame:
         html = self._fetch_html(url)
@@ -32,14 +33,15 @@ class SportsRefScraper:
     def _fetch_html(self, url: str, retries: int = 3) -> str:
         for attempt in range(retries):
             try:
+                self._wait_for_rate_limit()
                 response = self._client.get(url, params=self._zenrows_params)  # type: ignore
+                self._last_request_time = time.time()
 
                 if response.status_code != 200:
                     print(f"Failed with status {response.status_code}. Retrying...")
                 elif "table" not in response.text:
                     print("Response missing expected content. Retrying...")
                 else:
-                    sleep(8)
                     return response.text
 
             except Exception as e:
@@ -47,9 +49,19 @@ class SportsRefScraper:
 
             sleep_time = 10 * (attempt + 1)
             print(f"Retry {attempt + 1}/{retries}. Sleeping for {sleep_time} seconds...")
-            sleep(sleep_time)
+            time.sleep(sleep_time)
 
         raise ValueError("Failed to fetch HTML after all retries")
+
+    def _wait_for_rate_limit(self) -> None:
+        RATE_LIMIT_SECONDS = 8
+
+        elapsed = time.time() - self._last_request_time
+
+        if elapsed < RATE_LIMIT_SECONDS:
+            wait_time = RATE_LIMIT_SECONDS - elapsed
+            print(f"Rate limit: waiting {wait_time:.1f}s before next request...")
+            time.sleep(wait_time)
 
     def _parse_table(self, html: str, table_index: int) -> pd.DataFrame:
         soup = BeautifulSoup(html, "lxml")
