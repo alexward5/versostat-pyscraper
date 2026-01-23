@@ -106,10 +106,15 @@ class SportsRefScraper:
         return df[df.apply(is_data_row, axis=1)]
 
     def _set_df_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
-        # Infer and set appropriate data types for each colum
+        # Infer and set appropriate data types for each column
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=FutureWarning)
-            df = df.apply(pd.to_numeric, errors="ignore")
+            # Try to convert each column to numeric, keep original if conversion fails
+            for col in df.columns:
+                numeric_col = pd.to_numeric(df[col], errors="coerce")
+                # Only use numeric version if most values were successfully converted
+                if numeric_col.notna().sum() >= len(df) * 0.5:
+                    df[col] = numeric_col
         df = df.convert_dtypes()
 
         return df
@@ -124,3 +129,10 @@ class SportsRefScraper:
 
     def _to_snake_case(self, text: str) -> str:
         return text.strip().replace(" ", "_").replace("/", "_").lower()
+
+    def inspect_df(self, df: pd.DataFrame) -> None:
+        print(f"\nDataFrame shape: {df.shape}")
+        print(f"Columns ({len(df.columns)}): {list(df.columns)}")
+        print(f"\nData types:\n{df.dtypes}")
+        print(f"\nFirst 5 rows:\n{df.head()}")
+        print(f"\nLast 5 rows:\n{df.tail()}")
