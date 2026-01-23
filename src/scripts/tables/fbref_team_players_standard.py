@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 from typing import TypedDict
@@ -21,6 +22,12 @@ import pandas as pd
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 from src.classes.PostgresClient import PostgresClient
 from src.classes.SportsRefScraper import SportsRefScraper
