@@ -63,7 +63,7 @@ class SportsRefScraper:
 
         df = pd.read_html(StringIO(str(target_table)))[0]
 
-        # Handle multi-level column headers by flattening and combining
+        # Handle multi-level column headers by flattening and combining headers
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = [
                 "_".join(
@@ -74,17 +74,34 @@ class SportsRefScraper:
                 for col in df.columns
             ]
 
-        # Convert column names to snake_case
+        # Store original column names before converting to snake_case (for header row detection)
+        original_columns = set[str](str(col) for col in df.columns)
+
         df.columns = [self._to_snake_case(col) for col in df.columns]
 
-        # Drop any rows that are repeated headers (common in SR tables)
-        if "rk" in df.columns:
-            df = df[df["rk"] != "Rk"]
+        df = self._filter_non_data_rows(df, original_columns)
 
-        # Reset index after filtering
         df = df.reset_index(drop=True)
 
         return df
+
+    def _filter_non_data_rows(self, df: pd.DataFrame, original_columns: set) -> pd.DataFrame:
+        first_col = df.columns[0]
+
+        def is_data_row(row: pd.Series) -> bool:
+            first_val = str(row[first_col]) if pd.notna(row[first_col]) else ""
+
+            # Filter rows containing "total" in the first column (case-insensitive)
+            if "total" in first_val.lower():
+                return False
+
+            # Filter repeated header rows (first column value matches a column name)
+            if first_val in original_columns:
+                return False
+
+            return True
+
+        return df[df.apply(is_data_row, axis=1)]
 
     def _to_snake_case(self, text: str) -> str:
         return text.strip().replace(" ", "_").replace("/", "_").lower()
