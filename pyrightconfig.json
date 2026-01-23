@@ -15,6 +15,6 @@
 	"reportUntypedBaseClass": "error",
 	"reportImplicitOverride": "error",
 	"reportImplicitStringConcatenation": "error",
-	"reportPrivateUsage": "warning"
+	"reportMissingParameterType": "error"
 }
 
