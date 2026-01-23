@@ -66,13 +66,27 @@ class SportsRefScraper:
 
         # Handle multi-level column headers by flattening
         if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [col[-1] if col[-1] != col[0] else col[0] for col in df.columns]
+            df.columns = [
+                "_".join(
+                    str(level)
+                    for level in col
+                    if str(level).strip() and not str(level).startswith("Unnamed")
+                )
+                for col in df.columns
+            ]
+
+        # Convert column names to snake_case
+        df.columns = [self._to_snake_case(col) for col in df.columns]
 
         # Drop any rows that are repeated headers (common in SR tables)
-        if "Rk" in df.columns:
-            df = df[df["Rk"] != "Rk"]
+        if "rk" in df.columns:
+            df = df[df["rk"] != "Rk"]
 
         # Reset index after filtering
         df = df.reset_index(drop=True)
 
         return df
+
+    def _to_snake_case(self, text: str) -> str:
+        """Converts text to snake_case by replacing spaces with underscores and lowercasing."""
+        return text.strip().replace(" ", "_").replace("/", "_").lower()
