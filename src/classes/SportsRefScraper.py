@@ -32,31 +32,32 @@ class SportsRefScraper:
         }
         self._last_request_time: float = 0
 
-    def scrape_table(self, url: str, table_index: int = 0) -> pd.DataFrame:
-        html = self._fetch_html(url)
-        return self._parse_table(html, table_index)
-
-    def _fetch_html(self, url: str, retries: int = 3) -> str:
+    def scrape_table(self, url: str, table_index: int = 0, retries: int = 3) -> pd.DataFrame:
         for attempt in range(retries):
             try:
-                self._wait_for_rate_limit()
-                response = self._client.get(url, params=self._zenrows_params, timeout=60)  # type: ignore
-                self._last_request_time = time.time()
+                html = self._fetch_html(url)
+                return self._parse_table(html, table_index)
+            except (ValueError, IndexError) as e:
+                logger.warning("Scraping failed on attempt %s/%s: %s", attempt + 1, retries, e)
+                if attempt < retries - 1:
+                    sleep_time = 30 * (2**attempt)
+                    logger.info("Retrying in %s seconds...", sleep_time)
+                    time.sleep(sleep_time)
+                else:
+                    logger.error("Failed to scrape table after %s attempts", retries)
+                    raise
 
-                if response.status_code == 200 and "table" in response.text:
-                    return response.text
+        raise ValueError("Failed to scrape table after all retries")
 
-                logger.warning(
-                    "Failed: status=%s, has_table=%s", response.status_code, "table" in response.text
-                )
-            except Exception as e:
-                logger.error("Error while retrieving page content: %s", e)
+    def _fetch_html(self, url: str) -> str:
+        self._wait_for_rate_limit()
+        response = self._client.get(url, params=self._zenrows_params, timeout=60)  # type: ignore
+        self._last_request_time = time.time()
 
-            sleep_time = 30 * (2**attempt)
-            logger.info("Retry %s/%s. Sleeping for %s seconds...", attempt + 1, retries, sleep_time)
-            time.sleep(sleep_time)
+        if response.status_code == 200:
+            return response.text
 
-        raise ValueError("Failed to fetch HTML after all retries")
+        raise ValueError(f"Failed to fetch HTML: status={response.status_code}")
 
     def _wait_for_rate_limit(self) -> None:
         elapsed = time.time() - self._last_request_time
