@@ -61,10 +61,9 @@ class SportsRefScraper:
 
         target_table = tables[table_index]
 
-        # Sports Reference tables often have nested/commented HTML - extract clean table
         df = pd.read_html(StringIO(str(target_table)))[0]
 
-        # Handle multi-level column headers by flattening
+        # Handle multi-level column headers by flattening and combining
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = [
                 "_".join(
@@ -88,5 +87,4 @@ class SportsRefScraper:
         return df
 
     def _to_snake_case(self, text: str) -> str:
-        """Converts text to snake_case by replacing spaces with underscores and lowercasing."""
         return text.strip().replace(" ", "_").replace("/", "_").lower()
