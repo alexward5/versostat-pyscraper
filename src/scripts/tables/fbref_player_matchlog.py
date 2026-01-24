@@ -18,10 +18,6 @@ TABLE_NAME = "fbref_player_matchlog"
 PRIMARY_KEY = "fbref_player_matchweek_uuid"
 PLAYER_UUID = "fbref_player_uuid"
 
-# TODO: Remove these test limits before production
-TEST_LIMIT_TEAMS: int | None = 1
-TEST_LIMIT_PLAYERS: int | None = 1
-
 
 @dataclass
 class ProcessingState:
@@ -98,10 +94,6 @@ def main(schema: str) -> None:
         if row["squad_url"]
     ]
 
-    if TEST_LIMIT_TEAMS:
-        logger.warning("TEST MODE: Processing only %s team(s)", TEST_LIMIT_TEAMS)
-        teams = teams[:TEST_LIMIT_TEAMS]
-
     logger.info("Processing %s teams", len(teams))
     state = ProcessingState()
 
@@ -119,10 +111,6 @@ def main(schema: str) -> None:
             for _, row in team_df.iterrows()
             if row["matches_url"]
         ]
-
-        if TEST_LIMIT_PLAYERS:
-            logger.warning("TEST MODE: Processing only %s player(s) per team", TEST_LIMIT_PLAYERS)
-            players = players[:TEST_LIMIT_PLAYERS]
 
         logger.info("Found %s players for %s", len(players), squad_name)
 
