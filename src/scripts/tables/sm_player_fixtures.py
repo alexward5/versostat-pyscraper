@@ -29,7 +29,7 @@ from typing import Any
 import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
-from ...classes.SportsmonksAPI import SportsmonksAPI
+from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
 from ..helpers import insert_dataframe_rows
@@ -48,7 +48,7 @@ class ProcessingState:
     total_rows: int = 0
 
 
-def check_lineups_access(api: SportsmonksAPI) -> bool:
+def check_lineups_access(api: SportmonksAPI) -> bool:
     """Check if the current API plan has access to lineups include."""
     return api.check_lineups_access()
 
@@ -62,7 +62,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     db = PostgresClient()
     db.create_schema(schema)
 
-    api = SportsmonksAPI()
+    api = SportmonksAPI()
 
     # Check if we have lineups access
     logger.info("Checking API access for lineups include...")

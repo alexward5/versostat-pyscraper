@@ -11,7 +11,7 @@ from typing import Any
 import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
-from ...classes.SportsmonksAPI import SportsmonksAPI
+from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
 from ..helpers import insert_dataframe_rows
@@ -37,7 +37,7 @@ def build_team_fixture_row(
     opponent_id: int,
     opponent_name: str,
     is_home: bool,
-    api: SportsmonksAPI,
+    api: SportmonksAPI,
 ) -> dict[str, Any]:
     """Build a single row for a team's fixture statistics."""
     fixture_id = fixture_data.get("id")
@@ -88,7 +88,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     db = PostgresClient()
     db.create_schema(schema)
 
-    api = SportsmonksAPI()
+    api = SportmonksAPI()
 
     # Get completed fixtures only (no future games)
     fixtures = api.get_fixtures(include_future=False)

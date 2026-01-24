@@ -13,7 +13,7 @@ load_dotenv(".env.local")
 logger = setup_logger(__name__)
 
 
-class SportsmonksAPI:
+class SportmonksAPI:
     """Client for Sportmonks Football API v3."""
 
     BASE_URL = "https://api.sportmonks.com/v3/football"
@@ -35,7 +35,7 @@ class SportsmonksAPI:
         self._fetch_types()
         # Detect current season
         self._season_id = self._get_current_season_id()
-        logger.info("Initialized SportsmonksAPI with season ID: %s", self._season_id)
+        logger.info("Initialized SportmonksAPI with season ID: %s", self._season_id)
 
     @property
     def current_season_id(self) -> int:
@@ -207,7 +207,7 @@ class SportsmonksAPI:
         data = response.get("data", {})
         players = data.get("players", [])
         logger.info("Found %s players for team %s", len(players), team_id)
-        return list(players)
+        return list[dict[str, Any]](players)
 
     def get_player_statistics(self, player_id: int) -> dict[str, Any]:
         """Get player overall stats for the current season with resolved stat names."""
@@ -338,10 +338,7 @@ class SportsmonksAPI:
         if not include_future:
             # Filter to only completed fixtures (state_id 5 = finished)
             # Also check for fixtures with result_info to catch edge cases
-            completed = [
-                f for f in fixtures
-                if f.get("state_id") == 5 or f.get("result_info")
-            ]
+            completed = [f for f in fixtures if f.get("state_id") == 5 or f.get("result_info")]
             logger.info("Filtered to %s completed fixtures", len(completed))
             return completed
 
@@ -379,9 +376,7 @@ class SportsmonksAPI:
 
         return flat
 
-    def get_fixture_score(
-        self, fixture_data: dict[str, Any], team_id: int
-    ) -> dict[str, Any]:
+    def get_fixture_score(self, fixture_data: dict[str, Any], team_id: int) -> dict[str, Any]:
         """Extract score information for a specific team from fixture data."""
         scores = fixture_data.get("scores", [])
 
@@ -439,4 +434,4 @@ class SportsmonksAPI:
             f"/fixtures/{fixture_id}",
             params={"include": "lineups.player;lineups.statistics.details;participants"},
         )
-        return dict(response.get("data", {}))
+        return dict[str, Any](response.get("data", {}))

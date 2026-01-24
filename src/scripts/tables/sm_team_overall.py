@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
-from ...classes.SportsmonksAPI import SportsmonksAPI
+from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
 from ..helpers import insert_dataframe_rows
@@ -28,7 +28,7 @@ def main(schema: str, limit_teams: int | None = None) -> None:
     db = PostgresClient()
     db.create_schema(schema)
 
-    api = SportsmonksAPI()
+    api = SportmonksAPI()
 
     # Get all Premier League teams
     teams = api.get_teams()
