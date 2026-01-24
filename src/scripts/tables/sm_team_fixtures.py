@@ -14,7 +14,7 @@ from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
-from ..helpers import insert_dataframe_rows
+from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 

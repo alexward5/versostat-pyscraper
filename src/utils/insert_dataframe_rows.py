@@ -2,7 +2,7 @@ from typing import Any
 
 import pandas as pd
 
-from ...classes.PostgresClient import PostgresClient
+from ..classes.PostgresClient import PostgresClient
 
 
 def insert_dataframe_rows(
