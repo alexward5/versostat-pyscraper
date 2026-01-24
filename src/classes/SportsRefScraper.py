@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup, Tag
 from dotenv import load_dotenv
 from zenrows import ZenRowsClient  # type: ignore
 
-from ..utils.df_utils.sanitize_columns import sanitize_column_names
 from ..utils.logger import setup_logger
 
 load_dotenv(".env.local")
@@ -99,10 +98,7 @@ class SportsRefScraper:
 
         # Filter non-data rows and clean values
         df = self._filter_non_data_rows(df, original_columns).reset_index(drop=True)
-        df = self._clean_df_values(df)
-        
-        # Sanitize column names for database compatibility
-        return sanitize_column_names(df)
+        return self._clean_df_values(df)
 
     def _add_url_columns(self, df: pd.DataFrame, table_soup: Tag) -> None:
         tbody = table_soup.find("tbody")
@@ -188,4 +184,21 @@ class SportsRefScraper:
         return df.fillna("")
 
     def _to_snake_case(self, text: str) -> str:
-        return text.strip().replace(" ", "_").replace("/", "_").lower()
+        """Convert text to snake_case with database-compatible sanitization."""
+        text = text.strip()
+        
+        # Handle special characters with descriptive replacements
+        text = text.replace("+", "_plus_")
+        text = text.replace("-", "_minus_")
+        text = text.replace(" ", "_")
+        text = text.replace("/", "_")
+        
+        # Replace any remaining special characters with underscore
+        text = "".join(c if c.isalnum() or c == "_" else "_" for c in text)
+        
+        # Remove duplicate underscores
+        while "__" in text:
+            text = text.replace("__", "_")
+        
+        # Remove leading/trailing underscores and convert to lowercase
+        return text.strip("_").lower()
