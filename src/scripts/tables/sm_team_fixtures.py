@@ -1,8 +1,8 @@
 """
 Sportmonks Team Fixtures Scraper.
 
-NOTE: This script requires fixture-level data which may not be available
-on all Sportmonks API plans. Run with caution and expect potential API errors.
+Scrapes per-fixture team statistics for all completed Premier League matches
+in the current season.
 """
 import argparse
 from dataclasses import dataclass
@@ -30,97 +30,127 @@ class ProcessingState:
     total_rows: int = 0
 
 
-def flatten_team_fixture_stats(
+def build_team_fixture_row(
+    fixture_data: dict[str, Any],
     team_id: int,
     team_name: str,
-    fixture_id: int,
-    fixture_data: dict[str, Any],
-    api: SportsmonksAPI,
+    opponent_id: int,
+    opponent_name: str,
     is_home: bool,
+    api: SportsmonksAPI,
 ) -> dict[str, Any]:
-    """Flatten team statistics from a fixture into a single row."""
-    flat: dict[str, Any] = {
+    """Build a single row for a team's fixture statistics."""
+    fixture_id = fixture_data.get("id")
+
+    # Base fixture info
+    row: dict[str, Any] = {
         "team_fixture_id": f"{team_id}_{fixture_id}",
         "team_id": team_id,
         "team_name": team_name,
         "fixture_id": fixture_id,
         "season_id": api.current_season_id,
+        "fixture_date": fixture_data.get("starting_at", ""),
         "is_home": is_home,
+        "opponent_id": opponent_id,
+        "opponent_name": opponent_name,
     }
 
-    # Add fixture metadata
-    if fixture_data:
-        flat["fixture_date"] = fixture_data.get("starting_at", "")
+    # Add score data
+    score_data = api.get_fixture_score(fixture_data, team_id)
+    row.update(score_data)
 
-        participants = fixture_data.get("participants", [])
-        if len(participants) >= 2:
-            flat["opponent_id"] = participants[1].get("id") if is_home else participants[0].get("id")
-            flat["opponent_name"] = participants[1].get("name", "") if is_home else participants[0].get("name", "")
+    # Add opponent score
+    opponent_score = api.get_fixture_score(fixture_data, opponent_id)
+    row["goals_conceded"] = opponent_score.get("goals_scored")
 
-    # Get team-specific statistics
-    statistics = fixture_data.get("statistics", [])
-    for stat_group in statistics:
-        if stat_group.get("participant_id") == team_id:
-            flat.update(api.flatten_statistics([stat_group]))
-            break
+    # Determine result
+    goals_scored = row.get("goals_scored")
+    goals_conceded = row.get("goals_conceded")
+    if goals_scored is not None and goals_conceded is not None:
+        if goals_scored > goals_conceded:
+            row["result"] = "W"
+        elif goals_scored < goals_conceded:
+            row["result"] = "L"
+        else:
+            row["result"] = "D"
+    else:
+        row["result"] = ""
 
-    return flat
+    # Add flattened statistics
+    stats = api.flatten_fixture_team_stats(fixture_data, team_id)
+    row.update(stats)
+
+    return row
 
 
 def main(schema: str, limit_fixtures: int | None = None) -> None:
-    """Scrape Premier League team fixture stats and load into database.
-
-    NOTE: This endpoint may require a higher Sportmonks plan.
-    """
+    """Scrape Premier League team fixture stats and load into database."""
     db = PostgresClient()
     db.create_schema(schema)
 
     api = SportsmonksAPI()
 
-    # Try to get fixtures
-    fixtures = api.get_fixtures()
+    # Get completed fixtures only (no future games)
+    fixtures = api.get_fixtures(include_future=False)
 
     if not fixtures:
-        logger.warning("No fixtures available - this endpoint may require a plan upgrade")
+        logger.warning("No completed fixtures found")
         db.close()
         return
 
     if limit_fixtures:
+        # Sort by date descending and take most recent N fixtures
+        fixtures = sorted(fixtures, key=lambda x: x.get("starting_at", ""), reverse=True)
         fixtures = fixtures[:limit_fixtures]
-        logger.info("Limited to first %s fixtures for testing", limit_fixtures)
+        logger.info("Limited to %s most recent fixtures for testing", limit_fixtures)
 
-    logger.info("Processing %s fixtures", len(fixtures))
+    logger.info("Processing %s completed fixtures", len(fixtures))
     state = ProcessingState()
 
     all_team_fixture_stats: list[dict[str, object]] = []
 
-    for fixture in fixtures:
+    for i, fixture in enumerate(fixtures):
         fixture_id = fixture.get("id")
-        logger.info("Processing fixture ID: %s...", fixture_id)
 
         if not fixture_id:
             continue
 
         try:
-            # Get fixture details with statistics
-            fixture_details = api.get_fixture_statistics(fixture_id)
+            # Fetch fixture with full details
+            fixture_data = api.get_fixture_with_stats(fixture_id)
 
-            if not fixture_details:
-                logger.warning("No statistics for fixture %s", fixture_id)
+            if not fixture_data:
+                logger.warning("No data for fixture %s", fixture_id)
                 continue
 
-            # Extract team statistics from fixture
-            participants = fixture_details.get("participants", [])
-            for idx, participant in enumerate(participants):
-                team_id = participant.get("id")
-                team_name = participant.get("name", "")
-                is_home = idx == 0
+            # Extract participants
+            participants = fixture_data.get("participants", [])
+            if len(participants) < 2:
+                logger.warning("Fixture %s has incomplete participant data", fixture_id)
+                continue
 
-                if team_id:
-                    team_stats = flatten_team_fixture_stats(
-                        team_id, team_name, fixture_id, fixture_details, api, is_home
-                    )
-                    all_team_fixture_stats.append(team_stats)
+            home_team = participants[0]
+            away_team = participants[1]
+
+            home_id = home_team.get("id")
+            home_name = home_team.get("name", "")
+            away_id = away_team.get("id")
+            away_name = away_team.get("name", "")
+
+            # Build row for home team
+            home_row = build_team_fixture_row(
+                fixture_data, home_id, home_name, away_id, away_name, True, api
+            )
+            all_team_fixture_stats.append(home_row)
+
+            # Build row for away team
+            away_row = build_team_fixture_row(
+                fixture_data, away_id, away_name, home_id, home_name, False, api
+            )
+            all_team_fixture_stats.append(away_row)
+
+            if (i + 1) % 10 == 0:
+                logger.info("Processed %s/%s fixtures...", i + 1, len(fixtures))
 
         except Exception as e:
             logger.error("Error processing fixture %s: %s", fixture_id, e)
@@ -145,6 +175,8 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         cols = [PRIMARY_KEY] + [c for c in df.columns if c != PRIMARY_KEY]
         df = df[cols]
 
+    logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])
+
     # Create table and insert
     columns = build_table_columns_from_df(df, PRIMARY_KEY)
     db.create_table(schema, TABLE_NAME, columns)
@@ -155,7 +187,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     db.close()
 
     logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s fixtures, %s rows inserted", len(fixtures), state.total_rows)
+    logger.info("Completed: %s fixtures, %s team-fixture rows", len(fixtures), state.total_rows)
     logger.info("Table: %s.%s", schema, TABLE_NAME)
     logger.info("=" * 60)
 

@@ -1,8 +1,26 @@
 """
 Sportmonks Player Fixtures Scraper.
 
-NOTE: This script requires fixture-level data which may not be available
-on all Sportmonks API plans. Run with caution and expect potential API errors.
+NOTE: This script requires the 'lineups' include which is not available on the
+current Sportmonks API plan. The lineups include provides per-player statistics
+for each fixture.
+
+To use this script, you need to upgrade to a plan that includes:
+- lineups include on fixtures endpoint
+- Player-level fixture statistics
+
+Current plan provides:
+- Fixtures list (working)
+- Team-level fixture statistics (working - see sm_team_fixtures.py)
+- Participants/scores (working)
+
+Missing for player fixtures:
+- lineups include (Error 5002: "You do not have access to the 'lineups' include")
+
+When the plan is upgraded, this script will need to be updated to:
+1. Fetch fixtures with 'lineups.player' and 'lineups.statistics' includes
+2. Extract player-level stats from each fixture's lineup data
+3. Build rows with player_id, fixture_id, and their per-match statistics
 """
 import argparse
 from dataclasses import dataclass
@@ -30,93 +48,107 @@ class ProcessingState:
     total_rows: int = 0
 
 
-def flatten_player_fixture_stats(
-    player_id: int,
-    player_name: str,
-    fixture_id: int,
-    fixture_data: dict[str, Any],
-    api: SportsmonksAPI,
-) -> dict[str, Any]:
-    """Flatten player statistics from a fixture into a single row."""
-    flat: dict[str, Any] = {
-        "player_fixture_id": f"{player_id}_{fixture_id}",
-        "player_id": player_id,
-        "player_name": player_name,
-        "fixture_id": fixture_id,
-        "season_id": api.current_season_id,
-    }
-
-    # Add fixture metadata if available
-    if fixture_data:
-        flat["fixture_date"] = fixture_data.get("starting_at", "")
-        flat["home_team_id"] = fixture_data.get("participants", [{}])[0].get("id", "")
-        flat["away_team_id"] = (
-            fixture_data.get("participants", [{}])[1].get("id", "")
-            if len(fixture_data.get("participants", [])) > 1
-            else ""
-        )
-
-    # Flatten statistics
-    statistics = fixture_data.get("statistics", [])
-    flat.update(api.flatten_statistics(statistics))
-
-    return flat
+def check_lineups_access(api: SportsmonksAPI) -> bool:
+    """Check if the current API plan has access to lineups include."""
+    return api.check_lineups_access()
 
 
 def main(schema: str, limit_fixtures: int | None = None) -> None:
     """Scrape Premier League player fixture stats and load into database.
 
-    NOTE: This endpoint may require a higher Sportmonks plan.
+    NOTE: This endpoint requires the 'lineups' include which may not be
+    available on all API plans.
     """
     db = PostgresClient()
     db.create_schema(schema)
 
     api = SportsmonksAPI()
 
-    # Try to get fixtures
-    fixtures = api.get_fixtures()
+    # Check if we have lineups access
+    logger.info("Checking API access for lineups include...")
+    if not check_lineups_access(api):
+        logger.error("=" * 60)
+        logger.error("PLAN UPGRADE REQUIRED")
+        logger.error("=" * 60)
+        logger.error("The 'lineups' include is not available on your current plan.")
+        logger.error("This include is required to fetch player-level fixture statistics.")
+        logger.error("")
+        logger.error("Current plan supports:")
+        logger.error("  - Team fixture statistics (use sm_team_fixtures.py)")
+        logger.error("  - Player overall statistics (use sm_player_overall.py)")
+        logger.error("")
+        logger.error("To get player fixture stats, upgrade to a plan that includes:")
+        logger.error("  - 'lineups' include on fixtures endpoint")
+        logger.error("=" * 60)
+        db.close()
+        return
+
+    # If we get here, lineups access is available
+    # TODO: Implement full player fixture extraction when plan is upgraded
+    logger.info("Lineups access confirmed - proceeding with player fixtures extraction")
+
+    fixtures = api.get_fixtures(include_future=False)
 
     if not fixtures:
-        logger.warning("No fixtures available - this endpoint may require a plan upgrade")
+        logger.warning("No completed fixtures found")
         db.close()
         return
 
     if limit_fixtures:
+        fixtures = sorted(fixtures, key=lambda x: x.get("starting_at", ""), reverse=True)
         fixtures = fixtures[:limit_fixtures]
-        logger.info("Limited to first %s fixtures for testing", limit_fixtures)
+        logger.info("Limited to %s most recent fixtures for testing", limit_fixtures)
 
-    logger.info("Processing %s fixtures", len(fixtures))
+    logger.info("Processing %s completed fixtures", len(fixtures))
     state = ProcessingState()
 
-    all_player_fixture_stats: list[dict[str, object]] = []
+    all_player_fixture_stats: list[dict[str, Any]] = []
 
-    for fixture in fixtures:
+    for i, fixture in enumerate(fixtures):
         fixture_id = fixture.get("id")
-        logger.info("Processing fixture ID: %s...", fixture_id)
-
         if not fixture_id:
             continue
 
         try:
-            # Get fixture details with statistics
-            fixture_details = api.get_fixture_statistics(fixture_id)
+            # Fetch fixture with lineups
+            fixture_data = api.get_fixture_with_lineups(fixture_id)
 
-            if not fixture_details:
-                logger.warning("No statistics for fixture %s", fixture_id)
-                continue
+            lineups = fixture_data.get("lineups", [])
+            participants = {
+                p.get("id"): p.get("name")
+                for p in fixture_data.get("participants", [])
+            }
 
-            # Extract player statistics from fixture
-            # Structure varies by API response - adapt as needed
-            lineups = fixture_details.get("lineups", [])
             for lineup in lineups:
                 player_id = lineup.get("player_id")
-                player_name = lineup.get("player_name", "")
+                team_id = lineup.get("team_id")
+                player_data = lineup.get("player", {})
 
-                if player_id:
-                    player_stats = flatten_player_fixture_stats(
-                        player_id, player_name, fixture_id, fixture_details, api
-                    )
-                    all_player_fixture_stats.append(player_stats)
+                if not player_id:
+                    continue
+
+                row: dict[str, Any] = {
+                    "player_fixture_id": f"{player_id}_{fixture_id}",
+                    "player_id": player_id,
+                    "player_name": player_data.get("display_name", player_data.get("name", "")),
+                    "team_id": team_id,
+                    "team_name": participants.get(team_id, ""),
+                    "fixture_id": fixture_id,
+                    "fixture_date": fixture_data.get("starting_at", ""),
+                    "season_id": api.current_season_id,
+                    "position": lineup.get("position", ""),
+                    "jersey_number": lineup.get("jersey_number"),
+                    "is_starting": lineup.get("type_id") == 11,  # 11 = starting XI
+                }
+
+                # Flatten player statistics from this fixture
+                statistics = lineup.get("statistics", [])
+                row.update(api.flatten_statistics(statistics))
+
+                all_player_fixture_stats.append(row)
+
+            if (i + 1) % 10 == 0:
+                logger.info("Processed %s/%s fixtures...", i + 1, len(fixtures))
 
         except Exception as e:
             logger.error("Error processing fixture %s: %s", fixture_id, e)
@@ -141,6 +173,8 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         cols = [PRIMARY_KEY] + [c for c in df.columns if c != PRIMARY_KEY]
         df = df[cols]
 
+    logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])
+
     # Create table and insert
     columns = build_table_columns_from_df(df, PRIMARY_KEY)
     db.create_table(schema, TABLE_NAME, columns)
@@ -151,7 +185,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     db.close()
 
     logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s fixtures, %s rows inserted", len(fixtures), state.total_rows)
+    logger.info("Completed: %s fixtures, %s player-fixture rows", len(fixtures), state.total_rows)
     logger.info("Table: %s.%s", schema, TABLE_NAME)
     logger.info("=" * 60)
 

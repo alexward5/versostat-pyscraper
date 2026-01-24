@@ -320,32 +320,123 @@ class SportsmonksAPI:
             # Primitive value (int, float, str, bool, None)
             flat[prefix] = value
 
-    def get_fixtures(self) -> list[dict[str, Any]]:
-        """Get all fixtures for the current season (may require higher plan)."""
+    def get_fixtures(self, include_future: bool = True) -> list[dict[str, Any]]:
+        """Get all fixtures for the current season.
+
+        Args:
+            include_future: If True, include future fixtures. If False, only return
+                           fixtures that have already been played (have statistics).
+        """
         logger.info("Fetching fixtures for season ID: %s", self.current_season_id)
 
-        try:
-            fixtures = self._make_paginated_request(
-                "/fixtures",
-                params={"filters": f"fixtureSeasons:{self.current_season_id}"},
-            )
-            logger.info("Found %s fixtures", len(fixtures))
-            return fixtures
-        except ValueError as e:
-            logger.warning("Fixtures endpoint may require plan upgrade: %s", e)
-            return []
+        fixtures = self._make_paginated_request(
+            "/fixtures",
+            params={"filters": f"fixtureSeasons:{self.current_season_id}"},
+        )
+        logger.info("Found %s total fixtures", len(fixtures))
 
-    def get_fixture_statistics(
-        self,
-        fixture_id: int,
+        if not include_future:
+            # Filter to only completed fixtures (state_id 5 = finished)
+            # Also check for fixtures with result_info to catch edge cases
+            completed = [
+                f for f in fixtures
+                if f.get("state_id") == 5 or f.get("result_info")
+            ]
+            logger.info("Filtered to %s completed fixtures", len(completed))
+            return completed
+
+        return fixtures
+
+    def get_fixture_with_stats(self, fixture_id: int) -> dict[str, Any]:
+        """Get a fixture with participants, statistics, and scores."""
+        response = self._make_request(
+            f"/fixtures/{fixture_id}",
+            params={"include": "participants;statistics;scores"},
+        )
+        return dict(response.get("data", {}))
+
+    def flatten_fixture_team_stats(
+        self, fixture_data: dict[str, Any], team_id: int
     ) -> dict[str, Any]:
-        """Get statistics for a specific fixture (may require higher plan)."""
+        """Flatten fixture statistics for a specific team into a dict.
+
+        Fixture stats have structure: {type_id, participant_id, data: {value}, location}
+        """
+        flat: dict[str, Any] = {}
+
+        statistics = fixture_data.get("statistics", [])
+        for stat in statistics:
+            if stat.get("participant_id") != team_id:
+                continue
+
+            type_id = stat.get("type_id")
+            if type_id is None:
+                continue
+
+            stat_name = self.get_type_name(type_id)
+            value = stat.get("data", {}).get("value")
+            flat[stat_name] = value
+
+        return flat
+
+    def get_fixture_score(
+        self, fixture_data: dict[str, Any], team_id: int
+    ) -> dict[str, Any]:
+        """Extract score information for a specific team from fixture data."""
+        scores = fixture_data.get("scores", [])
+
+        result: dict[str, Any] = {
+            "goals_scored": None,
+            "goals_1st_half": None,
+            "goals_2nd_half": None,
+        }
+
+        for score in scores:
+            if score.get("participant_id") != team_id:
+                continue
+
+            description = score.get("description", "")
+            goals = score.get("score", {}).get("goals")
+
+            if description == "CURRENT":
+                result["goals_scored"] = goals
+            elif description == "1ST_HALF":
+                result["goals_1st_half"] = goals
+            elif description == "2ND_HALF":
+                result["goals_2nd_half"] = goals
+
+        return result
+
+    def check_lineups_access(self) -> bool:
+        """Check if the current API plan has access to lineups include.
+
+        Returns True if lineups data is accessible, False otherwise.
+        """
+        fixtures = self.get_fixtures(include_future=False)
+        if not fixtures:
+            return False
+
+        fixture_id = fixtures[0].get("id")
+
         try:
             response = self._make_request(
                 f"/fixtures/{fixture_id}",
-                params={"include": "statistics.details"},
+                params={"include": "lineups"},
             )
-            return dict(response.get("data", {}))
+            lineups = response.get("data", {}).get("lineups", [])
+            return len(lineups) > 0
         except ValueError as e:
-            logger.warning("Fixture statistics may require plan upgrade: %s", e)
-            return {}
+            if "5002" in str(e) or "do not have access" in str(e).lower():
+                return False
+            raise
+
+    def get_fixture_with_lineups(self, fixture_id: int) -> dict[str, Any]:
+        """Get a fixture with lineups, player data, and statistics.
+
+        Requires a plan with lineups access.
+        """
+        response = self._make_request(
+            f"/fixtures/{fixture_id}",
+            params={"include": "lineups.player;lineups.statistics.details;participants"},
+        )
+        return dict(response.get("data", {}))
