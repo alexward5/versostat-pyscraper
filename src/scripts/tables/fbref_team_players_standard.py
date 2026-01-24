@@ -4,7 +4,6 @@ from ...classes.PostgresClient import PostgresClient
 from ...classes.SportsRefScraper import SportsRefScraper
 from ...utils.df_utils.add_id_column import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
-from ...utils.df_utils.sanitize_columns import sanitize_column_names
 from ...utils.logger import setup_logger
 from ..helpers import insert_dataframe_rows, reorder_columns, validate_column_schema
 
@@ -45,7 +44,6 @@ def main(schema: str) -> None:
         logger.info_with_newline("Processing %s...", squad_name)
 
         players_df = scraper.scrape_table(team["url"], table_index=0)
-        players_df = sanitize_column_names(players_df)
         players_df["squad"] = squad_name
         players_df = add_id_column(
             players_df, source_columns=["player", "squad"], id_column_name=PRIMARY_KEY
@@ -55,7 +53,9 @@ def main(schema: str) -> None:
         # Set reference schema from first team, validate subsequent teams match
         if reference_columns is None:
             reference_columns = list[str](players_df.columns)
-            logger.info("Reference schema set from %s: %s columns", squad_name, len(reference_columns))
+            logger.info(
+                "Reference schema set from %s: %s columns", squad_name, len(reference_columns)
+            )
         else:
             validate_column_schema(players_df, reference_columns, squad_name)
             players_df.columns = reference_columns

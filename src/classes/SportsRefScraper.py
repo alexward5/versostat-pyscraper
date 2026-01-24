@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup, Tag
 from dotenv import load_dotenv
 from zenrows import ZenRowsClient  # type: ignore
 
+from ..utils.df_utils.sanitize_columns import sanitize_column_names
 from ..utils.logger import setup_logger
 
 load_dotenv(".env.local")
@@ -98,7 +99,10 @@ class SportsRefScraper:
 
         # Filter non-data rows and clean values
         df = self._filter_non_data_rows(df, original_columns).reset_index(drop=True)
-        return self._clean_df_values(df)
+        df = self._clean_df_values(df)
+        
+        # Sanitize column names for database compatibility
+        return sanitize_column_names(df)
 
     def _add_url_columns(self, df: pd.DataFrame, table_soup: Tag) -> None:
         tbody = table_soup.find("tbody")

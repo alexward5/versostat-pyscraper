@@ -7,7 +7,6 @@ from ...classes.PostgresClient import PostgresClient
 from ...classes.SportsRefScraper import SportsRefScraper
 from ...utils.df_utils.add_id_column import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
-from ...utils.df_utils.sanitize_columns import sanitize_column_names
 from ...utils.logger import setup_logger
 from ..helpers import insert_dataframe_rows, reorder_columns, validate_column_schema
 
@@ -53,7 +52,6 @@ def process_player_matchlog(
     Returns None if the player should be skipped.
     """
     matchlog_df = scraper.scrape_table(matchlog_url, table_index=0)
-    matchlog_df = sanitize_column_names(matchlog_df)
 
     if not has_required_columns(matchlog_df, {"comp"}, f"{player_name} ({squad_name})"):
         return None
@@ -112,7 +110,6 @@ def main(schema: str) -> None:
         logger.info_with_newline("Processing team: %s...", squad_name)
 
         team_df = scraper.scrape_table(team["url"], table_index=0)
-        team_df = sanitize_column_names(team_df)
 
         if not has_required_columns(team_df, {"player", "matches_url"}, squad_name):
             continue
@@ -144,7 +141,11 @@ def main(schema: str) -> None:
                 context = f"{player_name} ({squad_name})"
                 if state.reference_columns is None:
                     state.reference_columns = list[str](matchlog_df.columns)
-                    logger.info("Reference schema set from %s: %s columns", context, len(state.reference_columns))
+                    logger.info(
+                        "Reference schema set from %s: %s columns",
+                        context,
+                        len(state.reference_columns),
+                    )
                 else:
                     validate_column_schema(matchlog_df, state.reference_columns, context)
                     matchlog_df.columns = state.reference_columns
