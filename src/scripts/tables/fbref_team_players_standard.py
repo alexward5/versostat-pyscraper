@@ -1,25 +1,18 @@
 import argparse
-from typing import Any, TypedDict
 
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportsRefScraper import SportsRefScraper
 from ...utils.df_utils.add_id_column import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
-from ...utils.df_utils.sanitize_columns import sanitize_column_names
 from ...utils.logger import setup_logger
+from ..helpers import insert_dataframe_rows, reorder_columns, validate_column_schema
 
 logger = setup_logger(__name__)
 
-
-class TeamData(TypedDict):
-    squad: str
-    url: str
-
-
 BASE_URL = "https://fbref.com"
-PREMIER_LEAGUE_URL = "https://fbref.com/en/comps/9/Premier-League-Stats"
+PREMIER_LEAGUE_URL = f"{BASE_URL}/en/comps/9/Premier-League-Stats"
 TABLE_NAME = "fbref_team_players_standard"
-PRIMARY_KEY_COLUMN = "fbref_player_uuid"
+PRIMARY_KEY = "fbref_player_uuid"
 
 
 def main(schema: str) -> None:
@@ -30,76 +23,56 @@ def main(schema: str) -> None:
     scraper = SportsRefScraper()
     standings_df = scraper.scrape_table(PREMIER_LEAGUE_URL, table_index=0)
 
-    if "squad" not in standings_df.columns or "squad_url" not in standings_df.columns:
-        raise ValueError("Expected 'squad' and 'squad_url' columns not found in standings table")
+    required_cols = {"squad", "squad_url"}
+    if not required_cols.issubset(standings_df.columns):
+        raise ValueError(f"Missing required columns: {required_cols - set(standings_df.columns)}")
 
-    teams_data: list[TeamData] = [
-        {"squad": str(row["squad"]), "url": BASE_URL + str(row["squad_url"])}
+    teams = [
+        {"squad": str(row["squad"]), "url": f"{BASE_URL}{row['squad_url']}"}
         for _, row in standings_df.iterrows()
         if row["squad_url"]
     ]
 
-    logger.info("Processing %s teams", len(teams_data))
+    logger.info("Processing %s teams", len(teams))
 
     table_created = False
     total_rows = 0
-    reference_columns = None
+    reference_columns: list[str] | None = None
 
-    for team in teams_data:
-        logger.info_with_newline("Processing %s...", team["squad"])
+    for team in teams:
+        squad_name = team["squad"]
+        logger.info_with_newline("Processing %s...", squad_name)
 
         players_df = scraper.scrape_table(team["url"], table_index=0)
-        players_df = sanitize_column_names(players_df)
-        players_df["squad"] = team["squad"]
+        players_df["squad"] = squad_name
         players_df = add_id_column(
-            players_df, source_columns=["player", "squad"], id_column_name=PRIMARY_KEY_COLUMN
+            players_df, source_columns=["player", "squad"], id_column_name=PRIMARY_KEY
         )
+        players_df = reorder_columns(players_df, [PRIMARY_KEY])
 
-        # Reorder columns to put UUID first
-        players_df = players_df[
-            [PRIMARY_KEY_COLUMN] + [col for col in players_df.columns if col != PRIMARY_KEY_COLUMN]
-        ]
-
-        # Use column names from first table for all subsequent tables
+        # Set reference schema from first team, validate subsequent teams match
         if reference_columns is None:
             reference_columns = list[str](players_df.columns)
             logger.info(
-                "Reference columns set from %s: %s columns", team["squad"], len(reference_columns)
+                "Reference schema set from %s: %s columns", squad_name, len(reference_columns)
             )
         else:
-            # Ensure column count matches reference
-            if len(players_df.columns) != len(reference_columns):
-                raise ValueError(
-                    (
-                        f"Column count mismatch for {team['squad']}: "
-                        f"expected {len(reference_columns)} columns but got {len(players_df.columns)}. "
-                        f"Current columns: {list(players_df.columns)}"
-                    )
-                )
-            # Use reference column names instead of scraped column names
+            validate_column_schema(players_df, reference_columns, squad_name)
             players_df.columns = reference_columns
 
         if not table_created:
-            columns = build_table_columns_from_df(players_df, PRIMARY_KEY_COLUMN)
+            columns = build_table_columns_from_df(players_df, PRIMARY_KEY)
             db.create_table(schema, TABLE_NAME, columns)
             table_created = True
 
-        for _, row in players_df.iterrows():
-            db.insert_row(
-                schema=schema,
-                table_name=TABLE_NAME,
-                column_names=list[str](players_df.columns),
-                row_values=list[Any](row),
-                update_on=PRIMARY_KEY_COLUMN,
-            )
-
+        insert_dataframe_rows(db, schema, TABLE_NAME, players_df, PRIMARY_KEY)
         total_rows += len(players_df)
         logger.info("Inserted %s rows", len(players_df))
 
     db.close()
 
     logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s teams, %s total rows", len(teams_data), total_rows)
+    logger.info("Completed: %s teams, %s total rows", len(teams), total_rows)
     logger.info("Table: %s.%s", schema, TABLE_NAME)
     logger.info("=" * 60)
 
@@ -107,6 +80,5 @@ def main(schema: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scrape FBref team player standard stats")
     parser.add_argument("--schema", type=str, required=True, help="Database schema name to use")
-
     args = parser.parse_args()
     main(args.schema)

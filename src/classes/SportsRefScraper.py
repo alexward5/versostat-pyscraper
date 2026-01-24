@@ -184,4 +184,21 @@ class SportsRefScraper:
         return df.fillna("")
 
     def _to_snake_case(self, text: str) -> str:
-        return text.strip().replace(" ", "_").replace("/", "_").lower()
+        """Convert text to snake_case with database-compatible sanitization."""
+        text = text.strip()
+        
+        # Handle special characters with descriptive replacements
+        text = text.replace("+", "_plus_")
+        text = text.replace("-", "_minus_")
+        text = text.replace(" ", "_")
+        text = text.replace("/", "_")
+        
+        # Replace any remaining special characters with underscore
+        text = "".join(c if c.isalnum() or c == "_" else "_" for c in text)
+        
+        # Remove duplicate underscores
+        while "__" in text:
+            text = text.replace("__", "_")
+        
+        # Remove leading/trailing underscores and convert to lowercase
+        return text.strip("_").lower()

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.utils.map_pandas_dtype_to_postgres import map_pandas_dtype_to_postgres
+from src.utils.pg_utils.map_pandas_dtype_to_postgres import map_pandas_dtype_to_postgres
 
 
 def build_table_columns_from_df(df: pd.DataFrame, primary_key: str) -> list[str]:
