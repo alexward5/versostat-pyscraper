@@ -1,5 +1,7 @@
 import argparse
-from typing import Any, TypedDict
+from dataclasses import dataclass
+
+import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportsRefScraper import SportsRefScraper
@@ -7,30 +9,77 @@ from ...utils.df_utils.add_id_column import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.df_utils.sanitize_columns import sanitize_column_names
 from ...utils.logger import setup_logger
+from ..helpers import insert_dataframe_rows, reorder_columns, validate_column_schema
 
 logger = setup_logger(__name__)
 
-
-class TeamData(TypedDict):
-    squad: str
-    url: str
-
-
-class PlayerData(TypedDict):
-    player: str
-    squad: str
-    url: str
-
-
 BASE_URL = "https://fbref.com"
-PREMIER_LEAGUE_URL = "https://fbref.com/en/comps/9/Premier-League-Stats"
+PREMIER_LEAGUE_URL = f"{BASE_URL}/en/comps/9/Premier-League-Stats"
 TABLE_NAME = "fbref_player_matchlog"
-PRIMARY_KEY_COLUMN = "fbref_player_matchweek_uuid"
-PLAYER_UUID_COLUMN = "fbref_player_uuid"
+PRIMARY_KEY = "fbref_player_matchweek_uuid"
+PLAYER_UUID = "fbref_player_uuid"
 
 # TODO: Remove these test limits before production
-TEST_LIMIT_TEAMS = 1  # Set to None to process all teams
-TEST_LIMIT_PLAYERS = 1  # Set to None to process all players
+TEST_LIMIT_TEAMS: int | None = 1
+TEST_LIMIT_PLAYERS: int | None = 1
+
+
+@dataclass
+class ProcessingState:
+    """Tracks state across player processing iterations."""
+
+    table_created: bool = False
+    total_rows: int = 0
+    reference_columns: list[str] | None = None
+
+
+def has_required_columns(df: pd.DataFrame, columns: set[str], context: str) -> bool:
+    """Check if dataframe has required columns, logging a warning if not."""
+    missing = columns - set(df.columns)
+    if missing:
+        logger.warning("Skipping %s: missing columns %s", context, missing)
+        return False
+    return True
+
+
+def process_player_matchlog(
+    scraper: SportsRefScraper,
+    player_name: str,
+    squad_name: str,
+    matchlog_url: str,
+) -> pd.DataFrame | None:
+    """
+    Scrape and process a single player's matchlog.
+    Returns None if the player should be skipped.
+    """
+    matchlog_df = scraper.scrape_table(matchlog_url, table_index=0)
+    matchlog_df = sanitize_column_names(matchlog_df)
+
+    if not has_required_columns(matchlog_df, {"comp"}, f"{player_name} ({squad_name})"):
+        return None
+
+    # Filter for Premier League matches only
+    matchlog_df = matchlog_df[matchlog_df["comp"] == "Premier League"].copy()
+    if matchlog_df.empty:
+        logger.info("  No Premier League matches found for %s", player_name)
+        return None
+
+    if not has_required_columns(matchlog_df, {"round"}, f"{player_name} ({squad_name})"):
+        return None
+
+    # Add identifying columns
+    matchlog_df["player"] = player_name
+    matchlog_df["squad"] = squad_name
+
+    # Add UUID columns
+    matchlog_df = add_id_column(
+        matchlog_df, source_columns=["player", "squad"], id_column_name=PLAYER_UUID
+    )
+    matchlog_df = add_id_column(
+        matchlog_df, source_columns=["player", "squad", "round"], id_column_name=PRIMARY_KEY
+    )
+
+    return reorder_columns(matchlog_df, [PRIMARY_KEY, PLAYER_UUID])
 
 
 def main(schema: str) -> None:
@@ -41,170 +90,81 @@ def main(schema: str) -> None:
     scraper = SportsRefScraper()
     standings_df = scraper.scrape_table(PREMIER_LEAGUE_URL, table_index=0)
 
-    if "squad" not in standings_df.columns or "squad_url" not in standings_df.columns:
-        raise ValueError("Expected 'squad' and 'squad_url' columns not found in standings table")
+    required_cols = {"squad", "squad_url"}
+    if not required_cols.issubset(standings_df.columns):
+        raise ValueError(f"Missing required columns: {required_cols - set(standings_df.columns)}")
 
-    teams_data: list[TeamData] = [
-        {"squad": str(row["squad"]), "url": BASE_URL + str(row["squad_url"])}
+    teams = [
+        {"squad": str(row["squad"]), "url": f"{BASE_URL}{row['squad_url']}"}
         for _, row in standings_df.iterrows()
         if row["squad_url"]
     ]
 
-    # TODO: Remove this test limit before production
     if TEST_LIMIT_TEAMS:
         logger.warning("TEST MODE: Processing only %s team(s)", TEST_LIMIT_TEAMS)
-        teams_data = teams_data[:TEST_LIMIT_TEAMS]
+        teams = teams[:TEST_LIMIT_TEAMS]
 
-    logger.info("Processing %s teams", len(teams_data))
+    logger.info("Processing %s teams", len(teams))
+    state = ProcessingState()
 
-    table_created = False
-    total_rows = 0
-    reference_columns = None
+    for team in teams:
+        squad_name = team["squad"]
+        logger.info_with_newline("Processing team: %s...", squad_name)
 
-    for team in teams_data:
-        logger.info_with_newline("Processing team: %s...", team["squad"])
-
-        # Scrape team page to get player data
         team_df = scraper.scrape_table(team["url"], table_index=0)
         team_df = sanitize_column_names(team_df)
 
-        # Extract player data from team page
-        if "player" not in team_df.columns or "matches_url" not in team_df.columns:
-            logger.warning(
-                "Skipping %s: missing 'player' or 'matches_url' columns", team["squad"]
-            )
+        if not has_required_columns(team_df, {"player", "matches_url"}, squad_name):
             continue
 
-        players_data: list[PlayerData] = [
-            {
-                "player": str(row["player"]),
-                "squad": team["squad"],
-                "url": BASE_URL + str(row["matches_url"]),
-            }
+        players = [
+            {"name": str(row["player"]), "url": f"{BASE_URL}{row['matches_url']}"}
             for _, row in team_df.iterrows()
             if row["matches_url"]
         ]
 
-        # TODO: Remove this test limit before production
         if TEST_LIMIT_PLAYERS:
             logger.warning("TEST MODE: Processing only %s player(s) per team", TEST_LIMIT_PLAYERS)
-            players_data = players_data[:TEST_LIMIT_PLAYERS]
+            players = players[:TEST_LIMIT_PLAYERS]
 
-        logger.info("Found %s players for %s", len(players_data), team["squad"])
+        logger.info("Found %s players for %s", len(players), squad_name)
 
-        for player_data in players_data:
-            logger.info("  Processing player: %s...", player_data["player"])
+        for player in players:
+            player_name = player["name"]
+            logger.info("  Processing player: %s...", player_name)
 
             try:
-                # Scrape player matchlog page
-                matchlog_df = scraper.scrape_table(player_data["url"], table_index=0)
-                matchlog_df = sanitize_column_names(matchlog_df)
-
-                # Filter for Premier League matches only
-                if "comp" not in matchlog_df.columns:
-                    logger.warning(
-                        "Skipping %s (%s): missing 'comp' column",
-                        player_data["player"],
-                        player_data["squad"],
-                    )
-                    continue
-
-                matchlog_df = matchlog_df[matchlog_df["comp"] == "Premier League"].copy()
-
-                if len(matchlog_df) == 0:
-                    logger.info(
-                        "  No Premier League matches found for %s", player_data["player"]
-                    )
-                    continue
-
-                # Add player and squad columns
-                matchlog_df["player"] = player_data["player"]
-                matchlog_df["squad"] = player_data["squad"]
-
-                # Add fbref_player_uuid (Player + Squad)
-                matchlog_df = add_id_column(
-                    matchlog_df,
-                    source_columns=["player", "squad"],
-                    id_column_name=PLAYER_UUID_COLUMN,
+                matchlog_df = process_player_matchlog(
+                    scraper, player_name, squad_name, player["url"]
                 )
-
-                # Add fbref_player_matchweek_uuid as primary key (Player + Squad + Round)
-                if "round" not in matchlog_df.columns:
-                    logger.warning(
-                        "Skipping %s (%s): missing 'round' column",
-                        player_data["player"],
-                        player_data["squad"],
-                    )
+                if matchlog_df is None:
                     continue
 
-                matchlog_df = add_id_column(
-                    matchlog_df,
-                    source_columns=["player", "squad", "round"],
-                    id_column_name=PRIMARY_KEY_COLUMN,
-                )
-
-                # Reorder columns to put UUIDs first
-                other_columns = [
-                    col
-                    for col in matchlog_df.columns
-                    if col not in [PRIMARY_KEY_COLUMN, PLAYER_UUID_COLUMN]
-                ]
-                matchlog_df = matchlog_df[[PRIMARY_KEY_COLUMN, PLAYER_UUID_COLUMN] + other_columns]
-
-                # Use column names from first table for all subsequent tables
-                if reference_columns is None:
-                    reference_columns = list[str](matchlog_df.columns)
-                    logger.info(
-                        "Reference columns set from %s (%s): %s columns",
-                        player_data["player"],
-                        player_data["squad"],
-                        len(reference_columns),
-                    )
+                # Set reference schema from first player, validate subsequent players match
+                context = f"{player_name} ({squad_name})"
+                if state.reference_columns is None:
+                    state.reference_columns = list[str](matchlog_df.columns)
+                    logger.info("Reference schema set from %s: %s columns", context, len(state.reference_columns))
                 else:
-                    # Ensure column count matches reference
-                    if len(matchlog_df.columns) != len(reference_columns):
-                        raise ValueError(
-                            (
-                                f"Column count mismatch for {player_data['player']} ({player_data['squad']}): "
-                                f"expected {len(reference_columns)} columns but got {len(matchlog_df.columns)}. "
-                                f"Current columns: {list(matchlog_df.columns)}"
-                            )
-                        )
-                    # Use reference column names instead of scraped column names
-                    matchlog_df.columns = reference_columns
+                    validate_column_schema(matchlog_df, state.reference_columns, context)
+                    matchlog_df.columns = state.reference_columns
 
-                # Create table on first successful player
-                if not table_created:
-                    columns = build_table_columns_from_df(matchlog_df, PRIMARY_KEY_COLUMN)
+                if not state.table_created:
+                    columns = build_table_columns_from_df(matchlog_df, PRIMARY_KEY)
                     db.create_table(schema, TABLE_NAME, columns)
-                    table_created = True
+                    state.table_created = True
 
-                # Insert rows
-                for _, row in matchlog_df.iterrows():
-                    db.insert_row(
-                        schema=schema,
-                        table_name=TABLE_NAME,
-                        column_names=list[str](matchlog_df.columns),
-                        row_values=list[Any](row),
-                        update_on=PRIMARY_KEY_COLUMN,
-                    )
-
-                total_rows += len(matchlog_df)
-                logger.info("  Inserted %s rows for %s", len(matchlog_df), player_data["player"])
+                insert_dataframe_rows(db, schema, TABLE_NAME, matchlog_df, PRIMARY_KEY)
+                state.total_rows += len(matchlog_df)
+                logger.info("  Inserted %s rows for %s", len(matchlog_df), player_name)
 
             except Exception as e:
-                logger.error(
-                    "Error processing %s (%s): %s",
-                    player_data["player"],
-                    player_data["squad"],
-                    e,
-                )
-                continue
+                logger.error("Error processing %s (%s): %s", player_name, squad_name, e)
 
     db.close()
 
     logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s teams, %s total rows", len(teams_data), total_rows)
+    logger.info("Completed: %s teams, %s total rows", len(teams), state.total_rows)
     logger.info("Table: %s.%s", schema, TABLE_NAME)
     logger.info("=" * 60)
 
@@ -212,6 +172,5 @@ def main(schema: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scrape FBref player matchlog data")
     parser.add_argument("--schema", type=str, required=True, help="Database schema name to use")
-
     args = parser.parse_args()
     main(args.schema)
