@@ -249,12 +249,12 @@ class SportsmonksAPI:
             f"/teams/{team_id}",
             params={
                 "include": "statistics.details",
-                "filters": f"statisticSeasons:{sid}",
+                "filters": f"teamStatisticSeasons:{sid}",
             },
         )
 
         data = response.get("data", {})
-        return self._flatten_team_data(data)
+        return self._flatten_team_data(data, sid)
 
     def _flatten_player_data(self, player_data: dict[str, Any]) -> dict[str, Any]:
         """Flatten player data including statistics into a single dict."""
@@ -277,7 +277,9 @@ class SportsmonksAPI:
 
         return flat
 
-    def _flatten_team_data(self, team_data: dict[str, Any]) -> dict[str, Any]:
+    def _flatten_team_data(
+        self, team_data: dict[str, Any], season_id: int | None = None
+    ) -> dict[str, Any]:
         """Flatten team data including statistics into a single dict."""
         flat: dict[str, Any] = {
             "team_id": team_data.get("id"),
@@ -287,9 +289,22 @@ class SportsmonksAPI:
             "venue_id": team_data.get("venue_id"),
         }
 
-        # Flatten statistics
-        statistics = team_data.get("statistics", [])
-        flat.update(self.flatten_statistics(statistics))
+        # Filter and flatten statistics for the specific season
+        all_statistics = team_data.get("statistics", [])
+
+        # Filter to only the requested season if specified
+        if season_id is not None:
+            filtered_stats = [s for s in all_statistics if s.get("season_id") == season_id]
+            if filtered_stats:
+                flat.update(self.flatten_statistics(filtered_stats))
+            else:
+                # Fallback: if filter didn't work, use last entry (usually current)
+                logger.warning(
+                    "No statistics found for season %s, using all available", season_id
+                )
+                flat.update(self.flatten_statistics(all_statistics))
+        else:
+            flat.update(self.flatten_statistics(all_statistics))
 
         return flat
 
@@ -308,27 +323,38 @@ class SportsmonksAPI:
 
                 stat_name = self.get_type_name(type_id)
 
-                # Handle value types
-                if isinstance(value, dict):
-                    # Flatten nested value objects like {"total": 10, "average": 2.5}
-                    value_dict = cast(dict[str, Any], value)
-                    for sub_key, sub_val in value_dict.items():
-                        col_name = f"{stat_name}_{self._to_snake_case(sub_key)}"
-                        # Convert complex types to JSON strings
-                        flat[col_name] = self._sanitize_value(sub_val)
-                elif isinstance(value, list):
-                    # Convert lists to JSON strings
-                    flat[stat_name] = json.dumps(value)
-                else:
-                    flat[stat_name] = value
+                # Recursively flatten the value into individual columns
+                self._flatten_value(flat, stat_name, value)
 
         return flat
 
-    def _sanitize_value(self, value: Any) -> Any:
-        """Convert complex types (dict, list) to JSON strings for database storage."""
-        if isinstance(value, (dict, list)):
-            return json.dumps(value)
-        return value
+    def _flatten_value(
+        self, flat: dict[str, Any], prefix: str, value: Any, max_depth: int = 3
+    ) -> None:
+        """Recursively flatten nested values into flat dictionary.
+
+        Handles structures like:
+        - {"count": 10, "average": 2.5} -> prefix_count, prefix_average
+        - {"all": {"count": 4}, "home": {"count": 2}} -> prefix_all_count, prefix_home_count
+        - Lists are converted to JSON strings
+        - Primitives are stored directly
+        """
+        if max_depth <= 0:
+            # Safety limit reached, convert to JSON string
+            flat[prefix] = json.dumps(value) if isinstance(value, (dict, list)) else value
+            return
+
+        if isinstance(value, dict):
+            value_dict = cast(dict[str, Any], value)
+            for sub_key, sub_val in value_dict.items():
+                col_name = f"{prefix}_{self._to_snake_case(sub_key)}"
+                self._flatten_value(flat, col_name, sub_val, max_depth - 1)
+        elif isinstance(value, list):
+            # Convert lists to JSON strings
+            flat[prefix] = json.dumps(value)
+        else:
+            # Primitive value (int, float, str, bool, None)
+            flat[prefix] = value
 
     def get_fixtures_by_season(
         self,
