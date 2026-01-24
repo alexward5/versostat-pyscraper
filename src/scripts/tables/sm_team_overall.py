@@ -31,7 +31,7 @@ def main(schema: str, limit_teams: int | None = None) -> None:
     api = SportsmonksAPI()
 
     # Get all Premier League teams
-    teams = api.get_teams_by_season()
+    teams = api.get_teams()
     if limit_teams:
         teams = teams[:limit_teams]
         logger.info("Limited to first %s teams for testing", limit_teams)
@@ -51,8 +51,8 @@ def main(schema: str, limit_teams: int | None = None) -> None:
             continue
 
         try:
-            # Fetch team season statistics
-            team_stats = api.get_team_season_statistics(team_id)
+            # Fetch team statistics
+            team_stats = api.get_team_statistics(team_id)
 
             # Add season info
             team_stats["season_id"] = api.current_season_id

@@ -78,7 +78,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     api = SportsmonksAPI()
 
     # Try to get fixtures
-    fixtures = api.get_fixtures_by_season()
+    fixtures = api.get_fixtures()
 
     if not fixtures:
         logger.warning("No fixtures available - this endpoint may require a plan upgrade")

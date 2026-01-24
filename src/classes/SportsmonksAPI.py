@@ -1,4 +1,3 @@
-import json
 import os
 import re
 import time
@@ -119,9 +118,7 @@ class SportsmonksAPI:
         self._last_request_time = time.time()
 
         if response.status_code != 200:
-            raise ValueError(
-                f"API request failed: {response.status_code} - {response.text}"
-            )
+            raise ValueError(f"API request failed: {response.status_code} - {response.text}")
 
         return dict(response.json())
 
@@ -177,13 +174,12 @@ class SportsmonksAPI:
         # Remove leading/trailing underscores and convert to lowercase
         return text.strip("_").lower()
 
-    def get_teams_by_season(self, season_id: int | None = None) -> list[dict[str, Any]]:
-        """Get all teams in a season (defaults to current season)."""
-        sid = season_id or self.current_season_id
-        logger.info("Fetching teams for season ID: %s", sid)
+    def get_teams(self) -> list[dict[str, Any]]:
+        """Get all teams in the current season."""
+        logger.info("Fetching teams for season ID: %s", self.current_season_id)
 
         teams = self._make_paginated_request(
-            f"/seasons/{sid}",
+            f"/seasons/{self.current_season_id}",
             params={"include": "teams"},
         )
 
@@ -196,20 +192,15 @@ class SportsmonksAPI:
 
         return []
 
-    def get_players_by_team(
-        self,
-        team_id: int,
-        season_id: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """Get all players for a team in a season."""
-        sid = season_id or self.current_season_id
-        logger.info("Fetching players for team ID: %s, season ID: %s", team_id, sid)
+    def get_players_by_team(self, team_id: int) -> list[dict[str, Any]]:
+        """Get all players for a team in the current season."""
+        logger.info("Fetching players for team ID: %s", team_id)
 
         response = self._make_request(
             f"/teams/{team_id}",
             params={
                 "include": "players",
-                "filters": f"playerSeasonId:{sid}",
+                "filters": f"playerSeasonId:{self.current_season_id}",
             },
         )
 
@@ -218,43 +209,31 @@ class SportsmonksAPI:
         logger.info("Found %s players for team %s", len(players), team_id)
         return list(players)
 
-    def get_player_season_statistics(
-        self,
-        player_id: int,
-        season_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Get player overall stats for a season with resolved stat names."""
-        sid = season_id or self.current_season_id
-
+    def get_player_statistics(self, player_id: int) -> dict[str, Any]:
+        """Get player overall stats for the current season with resolved stat names."""
         response = self._make_request(
             f"/players/{player_id}",
             params={
                 "include": "statistics.details",
-                "filters": f"statisticSeasons:{sid}",
+                "filters": f"statisticSeasons:{self.current_season_id}",
             },
         )
 
         data = response.get("data", {})
         return self._flatten_player_data(data)
 
-    def get_team_season_statistics(
-        self,
-        team_id: int,
-        season_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Get team overall stats for a season with resolved stat names."""
-        sid = season_id or self.current_season_id
-
+    def get_team_statistics(self, team_id: int) -> dict[str, Any]:
+        """Get team overall stats for the current season with resolved stat names."""
         response = self._make_request(
             f"/teams/{team_id}",
             params={
                 "include": "statistics.details",
-                "filters": f"teamStatisticSeasons:{sid}",
+                "filters": f"teamStatisticSeasons:{self.current_season_id}",
             },
         )
 
         data = response.get("data", {})
-        return self._flatten_team_data(data, sid)
+        return self._flatten_team_data(data)
 
     def _flatten_player_data(self, player_data: dict[str, Any]) -> dict[str, Any]:
         """Flatten player data including statistics into a single dict."""
@@ -277,9 +256,7 @@ class SportsmonksAPI:
 
         return flat
 
-    def _flatten_team_data(
-        self, team_data: dict[str, Any], season_id: int | None = None
-    ) -> dict[str, Any]:
+    def _flatten_team_data(self, team_data: dict[str, Any]) -> dict[str, Any]:
         """Flatten team data including statistics into a single dict."""
         flat: dict[str, Any] = {
             "team_id": team_data.get("id"),
@@ -289,21 +266,17 @@ class SportsmonksAPI:
             "venue_id": team_data.get("venue_id"),
         }
 
-        # Filter and flatten statistics for the specific season
+        # Filter statistics to current season only
         all_statistics = team_data.get("statistics", [])
+        filtered_stats = [
+            s for s in all_statistics if s.get("season_id") == self.current_season_id
+        ]
 
-        # Filter to only the requested season if specified
-        if season_id is not None:
-            filtered_stats = [s for s in all_statistics if s.get("season_id") == season_id]
-            if filtered_stats:
-                flat.update(self.flatten_statistics(filtered_stats))
-            else:
-                # Fallback: if filter didn't work, use last entry (usually current)
-                logger.warning(
-                    "No statistics found for season %s, using all available", season_id
-                )
-                flat.update(self.flatten_statistics(all_statistics))
-        else:
+        if filtered_stats:
+            flat.update(self.flatten_statistics(filtered_stats))
+        elif all_statistics:
+            # Fallback if filter didn't match
+            logger.warning("No statistics found for current season, using all available")
             flat.update(self.flatten_statistics(all_statistics))
 
         return flat
@@ -336,12 +309,12 @@ class SportsmonksAPI:
         Handles structures like:
         - {"count": 10, "average": 2.5} -> prefix_count, prefix_average
         - {"all": {"count": 4}, "home": {"count": 2}} -> prefix_all_count, prefix_home_count
-        - Lists are converted to JSON strings
+        - Lists are skipped (not stored)
         - Primitives are stored directly
         """
         if max_depth <= 0:
-            # Safety limit reached, convert to JSON string
-            flat[prefix] = json.dumps(value) if isinstance(value, (dict, list)) else value
+            if not isinstance(value, (dict, list)):
+                flat[prefix] = value
             return
 
         if isinstance(value, dict):
@@ -350,24 +323,20 @@ class SportsmonksAPI:
                 col_name = f"{prefix}_{self._to_snake_case(sub_key)}"
                 self._flatten_value(flat, col_name, sub_val, max_depth - 1)
         elif isinstance(value, list):
-            # Convert lists to JSON strings
-            flat[prefix] = json.dumps(value)
+            # Don't store data that appears in a list
+            pass
         else:
             # Primitive value (int, float, str, bool, None)
             flat[prefix] = value
 
-    def get_fixtures_by_season(
-        self,
-        season_id: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """Get all fixtures for a season (may require higher plan)."""
-        sid = season_id or self.current_season_id
-        logger.info("Fetching fixtures for season ID: %s", sid)
+    def get_fixtures(self) -> list[dict[str, Any]]:
+        """Get all fixtures for the current season (may require higher plan)."""
+        logger.info("Fetching fixtures for season ID: %s", self.current_season_id)
 
         try:
             fixtures = self._make_paginated_request(
-                f"/fixtures",
-                params={"filters": f"fixtureSeasons:{sid}"},
+                "/fixtures",
+                params={"filters": f"fixtureSeasons:{self.current_season_id}"},
             )
             logger.info("Found %s fixtures", len(fixtures))
             return fixtures
