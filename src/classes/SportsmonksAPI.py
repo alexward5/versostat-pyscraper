@@ -215,7 +215,7 @@ class SportsmonksAPI:
             f"/players/{player_id}",
             params={
                 "include": "statistics.details",
-                "filters": f"statisticSeasons:{self.current_season_id}",
+                "filters": f"playerStatisticSeasons:{self.current_season_id}",
             },
         )
 
@@ -266,18 +266,9 @@ class SportsmonksAPI:
             "venue_id": team_data.get("venue_id"),
         }
 
-        # Filter statistics to current season only
-        all_statistics = team_data.get("statistics", [])
-        filtered_stats = [
-            s for s in all_statistics if s.get("season_id") == self.current_season_id
-        ]
-
-        if filtered_stats:
-            flat.update(self.flatten_statistics(filtered_stats))
-        elif all_statistics:
-            # Fallback if filter didn't match
-            logger.warning("No statistics found for current season, using all available")
-            flat.update(self.flatten_statistics(all_statistics))
+        # Statistics are already filtered by season via API filter (teamStatisticSeasons)
+        statistics = team_data.get("statistics", [])
+        flat.update(self.flatten_statistics(statistics))
 
         return flat
 
