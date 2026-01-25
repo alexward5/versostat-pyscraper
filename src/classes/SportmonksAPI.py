@@ -347,18 +347,9 @@ class SportmonksAPI:
     def get_completed_fixtures(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Get completed fixtures, optionally limited to the most recent N and sorted by date descending."""
         fixtures = self.get_fixtures(include_future=False)
-
-        if not fixtures:
-            return []
-
-        if limit:
-            fixtures = sorted(
-                fixtures, key=lambda x: x.get("starting_at", ""), reverse=True
-            )
-            fixtures = fixtures[:limit]
-            logger.info("Limited to %s most recent fixtures", limit)
-
-        return fixtures
+        return sorted(
+            fixtures, key=lambda x: x.get("starting_at", ""), reverse=True
+        )[:limit]
 
     def get_fixture_with_stats(self, fixture_id: int) -> dict[str, Any]:
         """Get a fixture with participants, statistics, and scores."""
