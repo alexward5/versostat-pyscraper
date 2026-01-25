@@ -10,7 +10,7 @@ from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils.add_id_column import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
-from ..helpers import insert_dataframe_rows, reorder_columns, validate_column_schema
+from ..helpers import insert_dataframe_rows, reorder_columns
 
 logger = setup_logger(__name__)
 
@@ -24,7 +24,6 @@ class ProcessingState:
 
     table_created: bool = False
     total_rows: int = 0
-    reference_columns: list[str] | None = None
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -89,18 +88,6 @@ def main(schema: str) -> None:
             history_df = process_player_history(history, player_id)
             if history_df is None:
                 continue
-
-            context = f"{player_name} (id={player_id})"
-            if state.reference_columns is None:
-                state.reference_columns = list[str](history_df.columns)
-                logger.info(
-                    "Reference schema set from %s: %s columns",
-                    context,
-                    len(state.reference_columns),
-                )
-            else:
-                validate_column_schema(history_df, state.reference_columns, context)
-                history_df.columns = state.reference_columns
 
             if not state.table_created:
                 columns = build_table_columns_from_df(history_df, PRIMARY_KEY)
