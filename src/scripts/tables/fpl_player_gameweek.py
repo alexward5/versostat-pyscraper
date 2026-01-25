@@ -59,9 +59,11 @@ def main(schema: str) -> None:
 
     logger.info("Fetching player list from FPL API...")
     bootstrap = api.get_bootstrap_static()
-    players: list[dict[str, Any]] = bootstrap["elements"]
+    all_players: list[dict[str, Any]] = bootstrap["elements"]
 
-    logger.info("Processing all %s players", len(players))
+    # Filter to only players who have played this season
+    players = [p for p in all_players if p.get("minutes", 0) > 0]
+    logger.info("Processing %s players with minutes > 0 (%s total)", len(players), len(all_players))
 
     state = ProcessingState()
     total_players = len(players)

@@ -39,8 +39,11 @@ def main(schema: str) -> None:
 
     api = FPL_API()
     logger.info("Fetching players from FPL API...")
-    players = api.get_players()
-    logger.info("Retrieved %s players", len(players))
+    all_players = api.get_players()
+
+    # Filter to only players who have played this season
+    players = [p for p in all_players if p.get("minutes", 0) > 0]
+    logger.info("Retrieved %s players (%s with minutes > 0)", len(all_players), len(players))
 
     df = pd.DataFrame(players)
     df = clean_dataframe(df)
