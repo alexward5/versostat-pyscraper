@@ -426,12 +426,31 @@ class SportmonksAPI:
             raise
 
     def get_fixture_with_lineups(self, fixture_id: int) -> dict[str, Any]:
-        """Get a fixture with lineups, player data, and statistics.
+        """Get a fixture with lineups, player details, and statistics.
 
         Requires a plan with lineups access.
         """
         response = self._make_request(
             f"/fixtures/{fixture_id}",
-            params={"include": "lineups.player;lineups.statistics.details;participants"},
+            params={"include": "lineups.details;participants"},
         )
         return dict[str, Any](response.get("data", {}))
+
+    def flatten_lineup_details(self, details: list[dict[str, Any]]) -> dict[str, Any]:
+        """Flatten lineup details (player fixture stats) into a dict.
+
+        Lineup details have structure: {type_id, data: {value}}
+        This is simpler than season statistics which have nested details.
+        """
+        flat: dict[str, Any] = {}
+
+        for detail in details:
+            type_id = detail.get("type_id")
+            if type_id is None:
+                continue
+
+            stat_name = self.get_type_name(type_id)
+            value = detail.get("data", {}).get("value")
+            flat[stat_name] = value
+
+        return flat

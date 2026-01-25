@@ -1,26 +1,8 @@
 """
 Sportmonks Player Fixtures Scraper.
 
-NOTE: This script requires the 'lineups' include which is not available on the
-current Sportmonks API plan. The lineups include provides per-player statistics
-for each fixture.
-
-To use this script, you need to upgrade to a plan that includes:
-- lineups include on fixtures endpoint
-- Player-level fixture statistics
-
-Current plan provides:
-- Fixtures list (working)
-- Team-level fixture statistics (working - see sm_team_fixtures.py)
-- Participants/scores (working)
-
-Missing for player fixtures:
-- lineups include (Error 5002: "You do not have access to the 'lineups' include")
-
-When the plan is upgraded, this script will need to be updated to:
-1. Fetch fixtures with 'lineups.player' and 'lineups.statistics' includes
-2. Extract player-level stats from each fixture's lineup data
-3. Build rows with player_id, fixture_id, and their per-match statistics
+Scrapes per-fixture player statistics for all completed Premier League matches
+in the current season. Requires the 'lineups' include on the Sportmonks API plan.
 """
 import argparse
 from dataclasses import dataclass
@@ -48,17 +30,46 @@ class ProcessingState:
     total_rows: int = 0
 
 
-def check_lineups_access(api: SportmonksAPI) -> bool:
-    """Check if the current API plan has access to lineups include."""
-    return api.check_lineups_access()
+def build_player_fixture_row(
+    lineup: dict[str, Any],
+    fixture_data: dict[str, Any],
+    participants: dict[int, str],
+    api: SportmonksAPI,
+) -> dict[str, Any] | None:
+    """Build a single row for a player's fixture statistics."""
+    player_id = lineup.get("player_id")
+    if not player_id:
+        return None
+
+    fixture_id = fixture_data.get("id")
+    team_id: int | None = lineup.get("team_id")
+    team_name = participants.get(team_id, "") if team_id is not None else ""
+
+    # Base player/fixture info
+    row: dict[str, Any] = {
+        "player_fixture_id": f"{player_id}_{fixture_id}",
+        "player_id": player_id,
+        "player_name": lineup.get("player_name", ""),
+        "team_id": team_id,
+        "team_name": team_name,
+        "fixture_id": fixture_id,
+        "fixture_date": fixture_data.get("starting_at", ""),
+        "season_id": api.current_season_id,
+        "position_id": lineup.get("position_id"),
+        "jersey_number": lineup.get("jersey_number"),
+        "formation_position": lineup.get("formation_position"),
+        "is_starting": lineup.get("type_id") == 11,  # 11 = starting XI, 12 = bench
+    }
+
+    # Flatten player statistics from this fixture
+    details = lineup.get("details", [])
+    row.update(api.flatten_lineup_details(details))
+
+    return row
 
 
 def main(schema: str, limit_fixtures: int | None = None) -> None:
-    """Scrape Premier League player fixture stats and load into database.
-
-    NOTE: This endpoint requires the 'lineups' include which may not be
-    available on all API plans.
-    """
+    """Scrape Premier League player fixture stats and load into database."""
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -66,16 +77,12 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     # Check if we have lineups access
     logger.info("Checking API access for lineups include...")
-    if not check_lineups_access(api):
+    if not api.check_lineups_access():
         logger.error("=" * 60)
         logger.error("PLAN UPGRADE REQUIRED")
         logger.error("=" * 60)
         logger.error("The 'lineups' include is not available on your current plan.")
         logger.error("This include is required to fetch player-level fixture statistics.")
-        logger.error("")
-        logger.error("Current plan supports:")
-        logger.error("  - Team fixture statistics (use sm_team_fixtures.py)")
-        logger.error("  - Player overall statistics (use sm_player_overall.py)")
         logger.error("")
         logger.error("To get player fixture stats, upgrade to a plan that includes:")
         logger.error("  - 'lineups' include on fixtures endpoint")
@@ -83,10 +90,9 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         db.close()
         return
 
-    # If we get here, lineups access is available
-    # TODO: Implement full player fixture extraction when plan is upgraded
     logger.info("Lineups access confirmed - proceeding with player fixtures extraction")
 
+    # Get completed fixtures only
     fixtures = api.get_fixtures(include_future=False)
 
     if not fixtures:
@@ -95,6 +101,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         return
 
     if limit_fixtures:
+        # Sort by date descending and take most recent N fixtures
         fixtures = sorted(fixtures, key=lambda x: x.get("starting_at", ""), reverse=True)
         fixtures = fixtures[:limit_fixtures]
         logger.info("Limited to %s most recent fixtures for testing", limit_fixtures)
@@ -110,7 +117,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             continue
 
         try:
-            # Fetch fixture with lineups
+            # Fetch fixture with lineups and details
             fixture_data = api.get_fixture_with_lineups(fixture_id)
 
             lineups = fixture_data.get("lineups", [])
@@ -120,32 +127,9 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             }
 
             for lineup in lineups:
-                player_id = lineup.get("player_id")
-                team_id = lineup.get("team_id")
-                player_data = lineup.get("player", {})
-
-                if not player_id:
-                    continue
-
-                row: dict[str, Any] = {
-                    "player_fixture_id": f"{player_id}_{fixture_id}",
-                    "player_id": player_id,
-                    "player_name": player_data.get("display_name", player_data.get("name", "")),
-                    "team_id": team_id,
-                    "team_name": participants.get(team_id, ""),
-                    "fixture_id": fixture_id,
-                    "fixture_date": fixture_data.get("starting_at", ""),
-                    "season_id": api.current_season_id,
-                    "position": lineup.get("position", ""),
-                    "jersey_number": lineup.get("jersey_number"),
-                    "is_starting": lineup.get("type_id") == 11,  # 11 = starting XI
-                }
-
-                # Flatten player statistics from this fixture
-                statistics = lineup.get("statistics", [])
-                row.update(api.flatten_statistics(statistics))
-
-                all_player_fixture_stats.append(row)
+                row = build_player_fixture_row(lineup, fixture_data, participants, api)
+                if row:
+                    all_player_fixture_stats.append(row)
 
             if (i + 1) % 10 == 0:
                 logger.info("Processed %s/%s fixtures...", i + 1, len(fixtures))
@@ -163,10 +147,14 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     df = pd.DataFrame(all_player_fixture_stats)
     df = df.convert_dtypes()
 
-    # Fill missing values
-    for col in df.select_dtypes(include=["number"]).columns:
-        df[col] = df[col].fillna(0)
-    df = df.fillna("")
+    # Fill missing values based on dtype
+    for col in df.columns:
+        if df[col].dtype == "boolean":
+            df[col] = df[col].fillna(False)
+        elif df[col].dtype in ["Int64", "Float64", "int64", "float64"]:
+            df[col] = df[col].fillna(0)
+        elif df[col].dtype == "object" or str(df[col].dtype).startswith("string"):
+            df[col] = df[col].fillna("")
 
     # Ensure primary key is first
     if PRIMARY_KEY in df.columns:
