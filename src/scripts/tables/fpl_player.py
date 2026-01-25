@@ -53,8 +53,8 @@ def main(schema: str) -> None:
 
     df = pd.DataFrame(players)
 
-    # Add team_str column by mapping team id to team name
-    df["team_str"] = df["team"].map(team_id_to_name)
+    # Add team_name column by mapping team id to team name
+    df["team_name"] = df["team"].map(team_id_to_name)
 
     df = clean_dataframe(df)
     df = reorder_columns(df, [PRIMARY_KEY])
