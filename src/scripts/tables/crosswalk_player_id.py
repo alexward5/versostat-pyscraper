@@ -5,9 +5,6 @@ from typing import Any
 import pandas as pd
 from rapidfuzz import fuzz, process  # type: ignore[import-untyped]
 
-# Type alias for rapidfuzz extractOne result
-ExtractResult = tuple[str, float, int] | None
-
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
@@ -27,6 +24,21 @@ FALLBACK_TEAM_MAPPINGS: dict[str, str] = {
     "Spurs": "Tottenham Hotspur",
     "Tottenham": "Tottenham Hotspur",
 }
+
+
+def fuzzy_extract_one(
+    query: str,
+    choices: list[str],
+    scorer: Any = fuzz.WRatio,
+) -> tuple[str, float, int] | None:
+    """
+    Typed wrapper for rapidfuzz.process.extractOne.
+    Returns (match, score, index) or None if no match found.
+    """
+    result: tuple[str, float, int] | None = process.extractOne(query, choices, scorer=scorer)
+    if result is None:
+        return None
+    return result
 
 
 @dataclass
@@ -95,9 +107,7 @@ def match_team_names(fpl_teams: list[str], sm_teams: list[str]) -> dict[str, str
                 continue
 
         # Fall back to fuzzy matching
-        result: ExtractResult = process.extractOne(
-            fpl_team, sm_teams, scorer=fuzz.WRatio
-        )  # pyright: ignore[reportUnknownMemberType]
+        result = fuzzy_extract_one(fpl_team, sm_teams, scorer=fuzz.WRatio)
         if result and result[1] >= TEAM_MATCH_THRESHOLD:
             matched_team: str = result[0]
             score: float = result[1]
@@ -149,9 +159,7 @@ def find_best_match(
 
         # Compare each FPL variant against each SM variant
         for fpl_name in fpl_variants:
-            result: ExtractResult = process.extractOne(
-                fpl_name, sm_variants, scorer=fuzz.WRatio
-            )  # pyright: ignore[reportUnknownMemberType]
+            result = fuzzy_extract_one(fpl_name, sm_variants, scorer=fuzz.WRatio)
             if result and result[1] >= threshold:
                 match_score: float = result[1]
                 if best_match is None or match_score > best_match[1]:
