@@ -18,7 +18,7 @@ PLAYER_MATCH_THRESHOLD = 80  # Minimum score to accept a player match
 TEAM_MATCH_THRESHOLD = 80  # Minimum score to accept a team match
 
 # Manual mappings for team name abbreviations/nicknames that fuzzy matching can't handle
-FALLBACK_TEAM_MAPPINGS: dict[str, str] = {
+MANUAL_TEAM_MAPPINGS: dict[str, str] = {
     "Man Utd": "Manchester United",
     "Man United": "Manchester United",
     "Spurs": "Tottenham Hotspur",
@@ -99,8 +99,8 @@ def match_team_names(fpl_teams: list[str], sm_teams: list[str]) -> dict[str, str
 
     for fpl_team in fpl_teams:
         # First check manual mappings for known abbreviations/nicknames
-        if fpl_team in FALLBACK_TEAM_MAPPINGS:
-            mapped_team = FALLBACK_TEAM_MAPPINGS[fpl_team]
+        if fpl_team in MANUAL_TEAM_MAPPINGS:
+            mapped_team = MANUAL_TEAM_MAPPINGS[fpl_team]
             if mapped_team in sm_teams_set:
                 team_mapping[fpl_team] = mapped_team
                 logger.info("Team match: '%s' -> '%s' (manual)", fpl_team, mapped_team)
