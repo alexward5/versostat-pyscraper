@@ -47,9 +47,9 @@ def main(schema: str) -> None:
     team_id_to_name: dict[int, str] = {t["id"]: t["name"] for t in teams}
     logger.info("Built team mapping for %s teams", len(team_id_to_name))
 
-    # Filter to only players who have played this season
-    players = [p for p in all_players if p.get("minutes", 0) > 0]
-    logger.info("Retrieved %s players (%s with minutes > 0)", len(all_players), len(players))
+    # Filter to only selectable players who have played this season
+    players = [p for p in all_players if p.get("minutes", 0) > 0 and p.get("can_select", False)]
+    logger.info("Retrieved %s players (%s selectable with minutes > 0)", len(all_players), len(players))
 
     df = pd.DataFrame(players)
 
