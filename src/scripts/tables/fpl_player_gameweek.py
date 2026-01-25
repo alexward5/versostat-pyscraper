@@ -15,7 +15,7 @@ from ..helpers import insert_dataframe_rows, reorder_columns
 logger = setup_logger(__name__)
 
 TABLE_NAME = "fpl_player_gameweek"
-PRIMARY_KEY = "element_round"
+PRIMARY_KEY = "uuid"
 
 
 @dataclass
