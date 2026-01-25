@@ -16,29 +16,15 @@ TABLE_NAME = "fpl_player"
 PRIMARY_KEY = "id"
 
 
-def is_nested(x: object) -> bool:
-    """Check if value is a dict or list."""
-    return isinstance(x, (dict, list))
-
-
-def serialize_value(x: object) -> object:
-    """Serialize dict/list to JSON string."""
-    if isinstance(x, (dict, list)):
-        return json.dumps(x)
-    return x
-
-
-def serialize_nested_fields(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert any dict/list fields to JSON strings for storage."""
-    for col in df.columns:
-        if df[col].apply(is_nested).any():
-            df[col] = df[col].apply(serialize_value)  # type: ignore[arg-type]
-    return df
-
-
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Clean and prepare DataFrame for database insertion."""
-    df = serialize_nested_fields(df)
+    # Serialize any nested dict/list fields to JSON strings
+    for col in df.columns:
+        if df[col].apply(lambda x: isinstance(x, (dict, list))).any():  # type: ignore[arg-type]
+            df[col] = df[col].apply(
+                lambda x: json.dumps(x) if isinstance(x, (dict, list)) else x  # type: ignore[arg-type, return-value]
+            )
+
     df = df.convert_dtypes()
 
     for col in df.select_dtypes(include=np.number).columns:

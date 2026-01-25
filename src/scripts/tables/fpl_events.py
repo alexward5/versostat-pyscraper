@@ -19,26 +19,15 @@ PRIMARY_KEY = "id"
 NESTED_FIELDS = ["chip_plays", "top_element_info", "overrides"]
 
 
-def serialize_value(x: object) -> str:
-    """Serialize a value to JSON string if dict/list, otherwise to string."""
-    if isinstance(x, (dict, list)):
-        return json.dumps(x)
-    if x is not None and x is not pd.NA and not (isinstance(x, float) and pd.isna(x)):
-        return str(x)
-    return ""
-
-
-def serialize_nested_fields(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert nested dict/list fields to JSON strings for storage."""
-    for col in NESTED_FIELDS:
-        if col in df.columns:
-            df[col] = df[col].apply(serialize_value)
-    return df
-
-
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Clean and prepare DataFrame for database insertion."""
-    df = serialize_nested_fields(df)
+    # Serialize known nested fields to JSON strings
+    for col in NESTED_FIELDS:
+        if col in df.columns:
+            df[col] = df[col].apply(
+                lambda x: json.dumps(x) if isinstance(x, (dict, list)) else (str(x) if x is not None and x is not pd.NA and not (isinstance(x, float) and pd.isna(x)) else "")  # type: ignore[arg-type]
+            )
+
     df = df.convert_dtypes()
 
     for col in df.select_dtypes(include=np.number).columns:

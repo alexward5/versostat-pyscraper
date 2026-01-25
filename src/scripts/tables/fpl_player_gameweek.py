@@ -36,11 +36,6 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df.fillna("")
 
 
-def make_primary_key(row: pd.Series) -> str:  # type: ignore[type-arg]
-    """Create composite primary key from element and round."""
-    return f"{row['element']}_{row['round']}"
-
-
 def process_player_history(
     history: list[dict[str, Any]], player_id: int
 ) -> pd.DataFrame | None:
@@ -51,7 +46,7 @@ def process_player_history(
     df = pd.DataFrame(history)
 
     # Add composite primary key: element_round (e.g., "123_5" for player 123, gameweek 5)
-    df[PRIMARY_KEY] = df.apply(make_primary_key, axis=1)
+    df[PRIMARY_KEY] = df.apply(lambda row: f"{row['element']}_{row['round']}", axis=1)  # type: ignore[arg-type]
 
     df = clean_dataframe(df)
     df = reorder_columns(df, [PRIMARY_KEY])
