@@ -51,7 +51,7 @@ def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.
     return df
 
 
-def main(schema: str, active_only: bool = False) -> None:
+def main(schema: str) -> None:
     """Fetch FPL player gameweek history and load into database."""
     db = PostgresClient()
     db.create_schema(schema)
@@ -62,11 +62,7 @@ def main(schema: str, active_only: bool = False) -> None:
     bootstrap = api.get_bootstrap_static()
     players: list[dict[str, Any]] = bootstrap["elements"]
 
-    if active_only:
-        players = [p for p in players if p.get("status") == "a"]
-        logger.info("Filtered to %s active players", len(players))
-    else:
-        logger.info("Processing all %s players", len(players))
+    logger.info("Processing all %s players", len(players))
 
     state = ProcessingState()
     total_players = len(players)
@@ -128,10 +124,5 @@ def main(schema: str, active_only: bool = False) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch FPL player gameweek history")
     parser.add_argument("--schema", type=str, required=True, help="Database schema name to use")
-    parser.add_argument(
-        "--active-only",
-        action="store_true",
-        help="Only process active players (status='a') to reduce run time",
-    )
     args = parser.parse_args()
-    main(args.schema, args.active_only)
+    main(args.schema)
