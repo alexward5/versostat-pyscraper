@@ -21,7 +21,7 @@ PLAYER_MATCH_THRESHOLD = 80  # Minimum score to accept a player match
 TEAM_MATCH_THRESHOLD = 80  # Minimum score to accept a team match
 
 # Manual mappings for team name abbreviations/nicknames that fuzzy matching can't handle
-KNOWN_TEAM_MAPPINGS: dict[str, str] = {
+FALLBACK_TEAM_MAPPINGS: dict[str, str] = {
     "Man Utd": "Manchester United",
     "Man United": "Manchester United",
     "Spurs": "Tottenham Hotspur",
@@ -83,12 +83,12 @@ def match_team_names(fpl_teams: list[str], sm_teams: list[str]) -> dict[str, str
     """
     team_mapping: dict[str, str] = {}
     unmatched: list[str] = []
-    sm_teams_set = set(sm_teams)
+    sm_teams_set = set[str](sm_teams)
 
     for fpl_team in fpl_teams:
         # First check manual mappings for known abbreviations/nicknames
-        if fpl_team in KNOWN_TEAM_MAPPINGS:
-            mapped_team = KNOWN_TEAM_MAPPINGS[fpl_team]
+        if fpl_team in FALLBACK_TEAM_MAPPINGS:
+            mapped_team = FALLBACK_TEAM_MAPPINGS[fpl_team]
             if mapped_team in sm_teams_set:
                 team_mapping[fpl_team] = mapped_team
                 logger.info("Team match: '%s' -> '%s' (manual)", fpl_team, mapped_team)
@@ -177,8 +177,12 @@ def main(schema: str) -> None:
         raise ValueError("One or both source tables are empty")
 
     # Extract unique team names
-    fpl_teams = list(set(str(p.get("team_name", "")) for p in fpl_players if p.get("team_name")))
-    sm_teams = list(set(str(p.get("team_name", "")) for p in sm_players if p.get("team_name")))
+    fpl_teams = list[str](
+        set[str](str(p.get("team_name", "")) for p in fpl_players if p.get("team_name"))
+    )
+    sm_teams = list[str](
+        set[str](str(p.get("team_name", "")) for p in sm_players if p.get("team_name"))
+    )
 
     logger.info_with_newline("Found %s FPL teams, %s SM teams", len(fpl_teams), len(sm_teams))
 
