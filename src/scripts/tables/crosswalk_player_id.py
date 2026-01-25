@@ -236,27 +236,13 @@ def main(schema: str) -> None:
 
         if match_result:
             sm_player, _score = match_result
-            sm_player_id = sm_player.get("player_id")  # SM uses 'player_id' column
-
-            # Only add to crosswalk if both IDs are present
-            if fpl_player_id and sm_player_id:
-                crosswalk_rows.append(
-                    {
-                        "fpl_player_id": fpl_player_id,
-                        "sm_player_id": sm_player_id,
-                    }
-                )
-                stats.matched += 1
-            else:
-                stats.unmatched += 1
-                fpl_names = get_fpl_name_variants(fpl_player)
-                stats.unmatched_players.append(
-                    {
-                        "name": fpl_names[0] if fpl_names else "unknown",
-                        "team": fpl_team,
-                        "reason": "missing ID",
-                    }
-                )
+            crosswalk_rows.append(
+                {
+                    "fpl_player_id": fpl_player_id,
+                    "sm_player_id": sm_player.get("player_id"),
+                }
+            )
+            stats.matched += 1
         else:
             stats.unmatched += 1
             fpl_names = get_fpl_name_variants(fpl_player)
