@@ -120,7 +120,7 @@ class SportmonksAPI:
         if response.status_code != 200:
             raise ValueError(f"API request failed: {response.status_code} - {response.text}")
 
-        return dict(response.json())
+        return dict[str, Any](response.json())
 
     def _make_paginated_request(
         self,
@@ -350,7 +350,7 @@ class SportmonksAPI:
             f"/fixtures/{fixture_id}",
             params={"include": "participants;statistics;scores"},
         )
-        return dict(response.get("data", {}))
+        return dict[str, Any](response.get("data", {}))
 
     def flatten_fixture_team_stats(
         self, fixture_data: dict[str, Any], team_id: int
