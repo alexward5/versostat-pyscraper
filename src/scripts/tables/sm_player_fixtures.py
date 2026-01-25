@@ -31,7 +31,6 @@ def build_player_fixture_row(
     team_id: int | None = lineup.get("team_id")
     team_name = participants.get(team_id, "") if team_id is not None else ""
 
-    # Base player/fixture info
     row: dict[str, Any] = {
         "player_fixture_id": f"{player_id}_{fixture_id}",
         "player_id": player_id,
@@ -44,10 +43,9 @@ def build_player_fixture_row(
         "position_id": lineup.get("position_id"),
         "jersey_number": lineup.get("jersey_number"),
         "formation_position": lineup.get("formation_position"),
-        "is_starting": lineup.get("type_id") == 11,  # 11 = starting XI, 12 = bench
+        "is_starting": lineup.get("type_id") == 11,
     }
 
-    # Flatten player statistics from this fixture
     details = lineup.get("details", [])
     row.update(api.flatten_lineup_details(details))
 
@@ -61,7 +59,6 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     api = SportmonksAPI()
 
-    # Get completed fixtures (optionally limited)
     fixtures = api.get_completed_fixtures(limit=limit_fixtures)
 
     if not fixtures:
@@ -79,7 +76,6 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             continue
 
         try:
-            # Fetch fixture with lineups and details
             fixture_data = api.get_fixture_with_lineups(fixture_id)
 
             lineups = fixture_data.get("lineups", [])
@@ -103,14 +99,12 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         db.close()
         return
 
-    # Build DataFrame
     logger.info("Building DataFrame from %s records...", len(all_player_fixture_stats))
     df = pd.DataFrame(all_player_fixture_stats)
     df = prepare_for_insert(df, PRIMARY_KEY)
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])
 
-    # Create table and insert
     columns = build_table_columns_from_df(df, PRIMARY_KEY)
     db.create_table(schema, TABLE_NAME, columns)
 

@@ -22,7 +22,6 @@ def main(schema: str, limit_teams: int | None = None) -> None:
 
     api = SportmonksAPI()
 
-    # Get all Premier League teams
     teams = api.get_teams()
     if limit_teams:
         teams = teams[:limit_teams]
@@ -42,10 +41,8 @@ def main(schema: str, limit_teams: int | None = None) -> None:
             continue
 
         try:
-            # Fetch team statistics
             team_stats = api.get_team_statistics(team_id)
 
-            # Add season info
             team_stats["season_id"] = api.current_season_id
 
             all_team_stats.append(team_stats)
@@ -59,14 +56,12 @@ def main(schema: str, limit_teams: int | None = None) -> None:
         db.close()
         return
 
-    # Build DataFrame from all collected stats
     logger.info("Building DataFrame from %s team records...", len(all_team_stats))
     df = pd.DataFrame(all_team_stats)
     df = prepare_for_insert(df, PRIMARY_KEY)
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:20])
 
-    # Create table and insert data
     columns = build_table_columns_from_df(df, PRIMARY_KEY)
     db.create_table(schema, TABLE_NAME, columns)
 

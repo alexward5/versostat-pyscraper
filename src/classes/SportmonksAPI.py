@@ -19,7 +19,7 @@ class SportmonksAPI:
     BASE_URL = "https://api.sportmonks.com/v3/football"
     CORE_URL = "https://api.sportmonks.com/v3/core"
     RATE_LIMIT_SECONDS = 1.0
-    PREMIER_LEAGUE_ID = 8  # Premier League league ID
+    PREMIER_LEAGUE_ID = 8
 
     def __init__(self) -> None:
         api_key = os.getenv("SPORTMONKS_API_KEY")
@@ -31,9 +31,7 @@ class SportmonksAPI:
         self._types_cache: dict[int, str] = {}
         self._season_id: int | None = None
 
-        # Fetch and cache types on initialization
         self._fetch_types()
-        # Detect current season
         self._season_id = self._get_current_season_id()
         logger.info("Initialized SportmonksAPI with season ID: %s", self._season_id)
 
@@ -51,7 +49,6 @@ class SportmonksAPI:
             params={"include": "currentSeason"},
         )
         data = response.get("data", {})
-        # API returns "currentseason" (no underscore, lowercase)
         current_season = data.get("currentseason")
         if not current_season:
             raise ValueError("Could not determine current Premier League season")
@@ -120,7 +117,7 @@ class SportmonksAPI:
         if response.status_code != 200:
             raise ValueError(f"API request failed: {response.status_code} - {response.text}")
 
-        return response.json()  # type: ignore[no-any-return]
+        return cast(dict[str, Any], response.json())
 
     def _make_paginated_request(
         self,
@@ -183,7 +180,7 @@ class SportmonksAPI:
             params={"include": "teams"},
         )
 
-        # The response wraps teams in the season data
+        # Response wraps teams in the season data
         if teams and len(teams) > 0:
             season_data = teams[0]
             team_list: list[dict[str, Any]] = season_data.get("teams", [])
@@ -250,7 +247,6 @@ class SportmonksAPI:
             "weight": player_data.get("weight"),
         }
 
-        # Flatten statistics
         statistics = player_data.get("statistics", [])
         flat.update(self.flatten_statistics(statistics))
 
@@ -266,7 +262,6 @@ class SportmonksAPI:
             "venue_id": team_data.get("venue_id"),
         }
 
-        # Statistics are already filtered by season via API filter (teamStatisticSeasons)
         statistics = team_data.get("statistics", [])
         flat.update(self.flatten_statistics(statistics))
 
@@ -347,9 +342,7 @@ class SportmonksAPI:
     def get_completed_fixtures(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Get completed fixtures, optionally limited to the most recent N and sorted by date descending."""
         fixtures = self.get_fixtures(include_future=False)
-        return sorted(
-            fixtures, key=lambda x: x.get("starting_at", ""), reverse=True
-        )[:limit]
+        return sorted(fixtures, key=lambda x: x.get("starting_at", ""), reverse=True)[:limit]
 
     def get_fixture_with_stats(self, fixture_id: int) -> dict[str, Any]:
         """Get a fixture with participants, statistics, and scores."""

@@ -1,9 +1,3 @@
-"""
-Sportmonks Team Fixtures Scraper.
-
-Scrapes per-fixture team statistics for all completed Premier League matches
-in the current season.
-"""
 import argparse
 from typing import Any
 
@@ -34,7 +28,6 @@ def build_team_fixture_row(
     """Build a single row for a team's fixture statistics."""
     fixture_id = fixture_data.get("id")
 
-    # Base fixture info
     row: dict[str, Any] = {
         "team_fixture_id": f"{team_id}_{fixture_id}",
         "team_id": team_id,
@@ -47,15 +40,12 @@ def build_team_fixture_row(
         "opponent_name": opponent_name,
     }
 
-    # Add score data
     score_data = api.get_fixture_score(fixture_data, team_id)
     row.update(score_data)
 
-    # Add opponent score
     opponent_score = api.get_fixture_score(fixture_data, opponent_id)
     row["goals_conceded"] = opponent_score.get("goals_scored")
 
-    # Determine result
     goals_scored = row.get("goals_scored")
     goals_conceded = row.get("goals_conceded")
     if goals_scored is not None and goals_conceded is not None:
@@ -68,7 +58,6 @@ def build_team_fixture_row(
     else:
         row["result"] = ""
 
-    # Add flattened statistics
     stats = api.flatten_fixture_team_stats(fixture_data, team_id)
     row.update(stats)
 
@@ -82,7 +71,6 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     api = SportmonksAPI()
 
-    # Get completed fixtures (optionally limited)
     fixtures = api.get_completed_fixtures(limit=limit_fixtures)
 
     if not fixtures:
@@ -101,14 +89,12 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             continue
 
         try:
-            # Fetch fixture with full details
             fixture_data = api.get_fixture_with_stats(fixture_id)
 
             if not fixture_data:
                 logger.warning("No data for fixture %s", fixture_id)
                 continue
 
-            # Extract participants
             participants = fixture_data.get("participants", [])
             if len(participants) < 2:
                 logger.warning("Fixture %s has incomplete participant data", fixture_id)
@@ -122,13 +108,11 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             away_id = away_team.get("id")
             away_name = away_team.get("name", "")
 
-            # Build row for home team
             home_row = build_team_fixture_row(
                 fixture_data, home_id, home_name, away_id, away_name, True, api
             )
             all_team_fixture_stats.append(home_row)
 
-            # Build row for away team
             away_row = build_team_fixture_row(
                 fixture_data, away_id, away_name, home_id, home_name, False, api
             )
@@ -145,14 +129,12 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         db.close()
         return
 
-    # Build DataFrame
     logger.info("Building DataFrame from %s records...", len(all_team_fixture_stats))
     df = pd.DataFrame(all_team_fixture_stats)
     df = prepare_for_insert(df, PRIMARY_KEY)
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])
 
-    # Create table and insert
     columns = build_table_columns_from_df(df, PRIMARY_KEY)
     db.create_table(schema, TABLE_NAME, columns)
 
