@@ -36,8 +36,7 @@ def fuzzy_extract_one(
     Returns (match, score, index) or None if no match found.
     """
     result: tuple[str, float, int] | None = process.extractOne(query, choices, scorer=scorer)
-    if result is None:
-        return None
+
     return result
 
 
