@@ -5,6 +5,7 @@ lxml
 zenrows
 pandas
 psycopg2-binary
+rapidfuzz
 
 # dev-packages
 black
