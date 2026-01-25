@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -39,7 +39,7 @@ class FPL_API:
                 self._last_request_time = time.time()
 
                 if response.status_code == 200:
-                    return response.json()  # type: ignore[no-any-return]
+                    return cast(dict[str, Any], response.json())
 
                 raise ValueError(f"API request failed: status={response.status_code}")
 
@@ -62,17 +62,17 @@ class FPL_API:
     def get_players(self) -> list[dict[str, Any]]:
         """Get all players (elements) from bootstrap-static."""
         data = self.get_bootstrap_static()
-        return data["elements"]  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], data["elements"])
 
     def get_events(self) -> list[dict[str, Any]]:
         """Get all gameweek events from bootstrap-static."""
         data = self.get_bootstrap_static()
-        return data["events"]  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], data["events"])
 
     def get_teams(self) -> list[dict[str, Any]]:
         """Get all teams from bootstrap-static."""
         data = self.get_bootstrap_static()
-        return data["teams"]  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], data["teams"])
 
     def get_player_summary(self, player_id: int) -> dict[str, Any]:
         """Fetch detailed player summary including history by gameweek."""
