@@ -1,11 +1,11 @@
 import argparse
-from dataclasses import dataclass
 
 import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import setup_logger
 from ...utils import insert_dataframe_rows
 
@@ -13,15 +13,6 @@ logger = setup_logger(__name__)
 
 TABLE_NAME = "sm_player_overall"
 PRIMARY_KEY = "player_id"
-
-
-@dataclass
-class ProcessingState:
-    """Tracks state across player processing iterations."""
-
-    table_created: bool = False
-    total_rows: int = 0
-    reference_columns: list[str] | None = None
 
 
 def main(schema: str, limit_teams: int | None = None) -> None:
@@ -38,7 +29,6 @@ def main(schema: str, limit_teams: int | None = None) -> None:
         logger.info("Limited to first %s teams for testing", limit_teams)
 
     logger.info("Processing %s teams", len(teams))
-    state = ProcessingState()
 
     all_player_stats: list[dict[str, object]] = []
 
@@ -83,19 +73,7 @@ def main(schema: str, limit_teams: int | None = None) -> None:
     # Build DataFrame from all collected stats
     logger.info("Building DataFrame from %s player records...", len(all_player_stats))
     df = pd.DataFrame(all_player_stats)
-
-    # Convert dtypes
-    df = df.convert_dtypes()
-
-    # Fill missing values: numeric with 0, others with empty string
-    for col in df.select_dtypes(include=["number"]).columns:
-        df[col] = df[col].fillna(0)
-    df = df.fillna("")
-
-    # Ensure primary key is first column
-    if PRIMARY_KEY in df.columns:
-        cols = [PRIMARY_KEY] + [c for c in df.columns if c != PRIMARY_KEY]
-        df = df[cols]
+    df = prepare_for_insert(df, PRIMARY_KEY)
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:20])
 
@@ -104,12 +82,11 @@ def main(schema: str, limit_teams: int | None = None) -> None:
     db.create_table(schema, TABLE_NAME, columns)
 
     insert_dataframe_rows(db, schema, TABLE_NAME, df, PRIMARY_KEY)
-    state.total_rows = len(df)
 
     db.close()
 
     logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s teams, %s player rows", len(teams), state.total_rows)
+    logger.info("Completed: %s teams, %s player rows", len(teams), len(df))
     logger.info("Table: %s.%s", schema, TABLE_NAME)
     logger.info("=" * 60)
 

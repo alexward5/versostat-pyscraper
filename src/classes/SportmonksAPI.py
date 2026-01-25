@@ -120,7 +120,7 @@ class SportmonksAPI:
         if response.status_code != 200:
             raise ValueError(f"API request failed: {response.status_code} - {response.text}")
 
-        return dict[str, Any](response.json())
+        return response.json()  # type: ignore[no-any-return]
 
     def _make_paginated_request(
         self,
@@ -205,9 +205,9 @@ class SportmonksAPI:
         )
 
         data = response.get("data", {})
-        players = data.get("players", [])
+        players: list[dict[str, Any]] = data.get("players", [])
         logger.info("Found %s players for team %s", len(players), team_id)
-        return list[dict[str, Any]](players)
+        return players
 
     def get_player_statistics(self, player_id: int) -> dict[str, Any]:
         """Get player overall stats for the current season with resolved stat names."""
@@ -344,13 +344,29 @@ class SportmonksAPI:
 
         return fixtures
 
+    def get_completed_fixtures(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """Get completed fixtures, optionally limited to the most recent N and sorted by date descending."""
+        fixtures = self.get_fixtures(include_future=False)
+
+        if not fixtures:
+            return []
+
+        if limit:
+            fixtures = sorted(
+                fixtures, key=lambda x: x.get("starting_at", ""), reverse=True
+            )
+            fixtures = fixtures[:limit]
+            logger.info("Limited to %s most recent fixtures", limit)
+
+        return fixtures
+
     def get_fixture_with_stats(self, fixture_id: int) -> dict[str, Any]:
         """Get a fixture with participants, statistics, and scores."""
         response = self._make_request(
             f"/fixtures/{fixture_id}",
             params={"include": "participants;statistics;scores"},
         )
-        return dict[str, Any](response.get("data", {}))
+        return response.get("data", {})
 
     def flatten_fixture_team_stats(
         self, fixture_data: dict[str, Any], team_id: int
@@ -408,7 +424,7 @@ class SportmonksAPI:
             f"/fixtures/{fixture_id}",
             params={"include": "lineups.details;participants"},
         )
-        return dict[str, Any](response.get("data", {}))
+        return response.get("data", {})
 
     def flatten_lineup_details(self, details: list[dict[str, Any]]) -> dict[str, Any]:
         """Flatten lineup details (player fixture stats) into a dict.

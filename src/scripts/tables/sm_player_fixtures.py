@@ -1,5 +1,4 @@
 import argparse
-from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -7,6 +6,7 @@ import pandas as pd
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import setup_logger
 from ...utils import insert_dataframe_rows
 
@@ -14,14 +14,6 @@ logger = setup_logger(__name__)
 
 TABLE_NAME = "sm_player_fixtures"
 PRIMARY_KEY = "player_fixture_id"
-
-
-@dataclass
-class ProcessingState:
-    """Tracks state across fixture processing iterations."""
-
-    table_created: bool = False
-    total_rows: int = 0
 
 
 def build_player_fixture_row(
@@ -69,22 +61,15 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     api = SportmonksAPI()
 
-    # Get completed fixtures only
-    fixtures = api.get_fixtures(include_future=False)
+    # Get completed fixtures (optionally limited)
+    fixtures = api.get_completed_fixtures(limit=limit_fixtures)
 
     if not fixtures:
         logger.warning("No completed fixtures found")
         db.close()
         return
 
-    if limit_fixtures:
-        # Sort by date descending and take most recent N fixtures
-        fixtures = sorted(fixtures, key=lambda x: x.get("starting_at", ""), reverse=True)
-        fixtures = fixtures[:limit_fixtures]
-        logger.info("Limited to %s most recent fixtures for testing", limit_fixtures)
-
     logger.info("Processing %s completed fixtures", len(fixtures))
-    state = ProcessingState()
 
     all_player_fixture_stats: list[dict[str, Any]] = []
 
@@ -121,21 +106,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     # Build DataFrame
     logger.info("Building DataFrame from %s records...", len(all_player_fixture_stats))
     df = pd.DataFrame(all_player_fixture_stats)
-    df = df.convert_dtypes()
-
-    # Fill missing values based on dtype
-    for col in df.columns:
-        if df[col].dtype == "boolean":
-            df[col] = df[col].fillna(False)
-        elif df[col].dtype in ["Int64", "Float64", "int64", "float64"]:
-            df[col] = df[col].fillna(0)
-        elif df[col].dtype == "object" or str(df[col].dtype).startswith("string"):
-            df[col] = df[col].fillna("")
-
-    # Ensure primary key is first
-    if PRIMARY_KEY in df.columns:
-        cols = [PRIMARY_KEY] + [c for c in df.columns if c != PRIMARY_KEY]
-        df = df[cols]
+    df = prepare_for_insert(df, PRIMARY_KEY)
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])
 
@@ -144,12 +115,11 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     db.create_table(schema, TABLE_NAME, columns)
 
     insert_dataframe_rows(db, schema, TABLE_NAME, df, PRIMARY_KEY)
-    state.total_rows = len(df)
 
     db.close()
 
     logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s fixtures, %s player-fixture rows", len(fixtures), state.total_rows)
+    logger.info("Completed: %s fixtures, %s player-fixture rows", len(fixtures), len(df))
     logger.info("Table: %s.%s", schema, TABLE_NAME)
     logger.info("=" * 60)
 
