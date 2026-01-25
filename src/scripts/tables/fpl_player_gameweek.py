@@ -7,6 +7,7 @@ import pandas as pd
 
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
+from ...utils.df_utils.add_id_column import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
 from ..helpers import insert_dataframe_rows, reorder_columns, validate_column_schema
@@ -45,9 +46,7 @@ def process_player_history(
 
     df = pd.DataFrame(history)
 
-    # Add composite primary key: element_round (e.g., "123_5" for player 123, gameweek 5)
-    df[PRIMARY_KEY] = df.apply(lambda row: f"{row['element']}_{row['round']}", axis=1)  # type: ignore[arg-type]
-
+    df = add_id_column(df, source_columns=["element", "round"], id_column_name=PRIMARY_KEY)
     df = clean_dataframe(df)
     df = reorder_columns(df, [PRIMARY_KEY])
 
