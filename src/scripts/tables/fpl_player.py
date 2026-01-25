@@ -41,11 +41,21 @@ def main(schema: str) -> None:
     logger.info("Fetching players from FPL API...")
     all_players = api.get_players()
 
+    # Fetch teams to create team id -> team name mapping
+    logger.info("Fetching teams from FPL API...")
+    teams = api.get_teams()
+    team_id_to_name: dict[int, str] = {t["id"]: t["name"] for t in teams}
+    logger.info("Built team mapping for %s teams", len(team_id_to_name))
+
     # Filter to only players who have played this season
     players = [p for p in all_players if p.get("minutes", 0) > 0]
     logger.info("Retrieved %s players (%s with minutes > 0)", len(all_players), len(players))
 
     df = pd.DataFrame(players)
+
+    # Add team_str column by mapping team id to team name
+    df["team_str"] = df["team"].map(team_id_to_name)
+
     df = clean_dataframe(df)
     df = reorder_columns(df, [PRIMARY_KEY])
 
