@@ -37,9 +37,7 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df.fillna("")
 
 
-def process_player_history(
-    history: list[dict[str, Any]], player_id: int
-) -> pd.DataFrame | None:
+def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.DataFrame | None:
     """Process a single player's gameweek history into a DataFrame."""
     if not history:
         return None
@@ -73,7 +71,7 @@ def main(schema: str, active_only: bool = False) -> None:
     state = ProcessingState()
     total_players = len(players)
 
-    for idx, player in enumerate(players):
+    for idx, player in enumerate[dict[str, Any]](players):
         player_id: int = player["id"]
         player_name: str = player.get("web_name", f"Player {player_id}")
 
