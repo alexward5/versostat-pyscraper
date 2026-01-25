@@ -18,12 +18,11 @@ PRIMARY_KEY = "id"
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Clean and prepare DataFrame for database insertion."""
-    # Serialize any nested dict/list fields to JSON strings
+    # Detect nested dict/list columns by checking first value, then serialize to JSON
     for col in df.columns:
-        if df[col].apply(lambda x: isinstance(x, (dict, list))).any():  # type: ignore[arg-type]
-            df[col] = df[col].apply(
-                lambda x: json.dumps(x) if isinstance(x, (dict, list)) else x  # type: ignore[arg-type, return-value]
-            )
+        non_null = df[col].dropna()
+        if len(non_null) > 0 and isinstance(non_null.iloc[0], (dict, list)):
+            df[col] = df[col].apply(json.dumps)
 
     df = df.convert_dtypes()
 
