@@ -1,9 +1,3 @@
-"""
-Sportmonks Player Fixtures Scraper.
-
-Scrapes per-fixture player statistics for all completed Premier League matches
-in the current season. Requires the 'lineups' include on the Sportmonks API plan.
-"""
 import argparse
 from dataclasses import dataclass
 from typing import Any
@@ -75,23 +69,6 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     api = SportmonksAPI()
 
-    # Check if we have lineups access
-    logger.info("Checking API access for lineups include...")
-    if not api.check_lineups_access():
-        logger.error("=" * 60)
-        logger.error("PLAN UPGRADE REQUIRED")
-        logger.error("=" * 60)
-        logger.error("The 'lineups' include is not available on your current plan.")
-        logger.error("This include is required to fetch player-level fixture statistics.")
-        logger.error("")
-        logger.error("To get player fixture stats, upgrade to a plan that includes:")
-        logger.error("  - 'lineups' include on fixtures endpoint")
-        logger.error("=" * 60)
-        db.close()
-        return
-
-    logger.info("Lineups access confirmed - proceeding with player fixtures extraction")
-
     # Get completed fixtures only
     fixtures = api.get_fixtures(include_future=False)
 
@@ -122,8 +99,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
             lineups = fixture_data.get("lineups", [])
             participants = {
-                p.get("id"): p.get("name")
-                for p in fixture_data.get("participants", [])
+                p.get("id"): p.get("name") for p in fixture_data.get("participants", [])
             }
 
             for lineup in lineups:

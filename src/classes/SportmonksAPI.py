@@ -402,34 +402,8 @@ class SportmonksAPI:
 
         return result
 
-    def check_lineups_access(self) -> bool:
-        """Check if the current API plan has access to lineups include.
-
-        Returns True if lineups data is accessible, False otherwise.
-        """
-        fixtures = self.get_fixtures(include_future=False)
-        if not fixtures:
-            return False
-
-        fixture_id = fixtures[0].get("id")
-
-        try:
-            response = self._make_request(
-                f"/fixtures/{fixture_id}",
-                params={"include": "lineups"},
-            )
-            lineups = response.get("data", {}).get("lineups", [])
-            return len(lineups) > 0
-        except ValueError as e:
-            if "5002" in str(e) or "do not have access" in str(e).lower():
-                return False
-            raise
-
     def get_fixture_with_lineups(self, fixture_id: int) -> dict[str, Any]:
-        """Get a fixture with lineups, player details, and statistics.
-
-        Requires a plan with lineups access.
-        """
+        """Get a fixture with lineups and player details/statistics."""
         response = self._make_request(
             f"/fixtures/{fixture_id}",
             params={"include": "lineups.details;participants"},
