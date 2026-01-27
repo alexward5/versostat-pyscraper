@@ -83,7 +83,7 @@ def run_scripts(
     logger.info("=" * 60)
     logger.info("Schema: %s", schema)
     logger.info(
-        "Total: %s | Successful: %s | Failed: %s", len(scripts_to_run), len(successful), len(failed)
+        "Total: %s / Successful: %s / Failed: %s", len(scripts_to_run), len(successful), len(failed)
     )
 
     if successful:
