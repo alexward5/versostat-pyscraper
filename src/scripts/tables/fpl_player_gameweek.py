@@ -1,39 +1,20 @@
 import argparse
-from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
-from ...utils.df_utils.add_id_column import add_id_column
+from ...utils.df_utils import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import setup_logger
-from ..helpers import insert_dataframe_rows, reorder_columns
+from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 
 TABLE_NAME = "fpl_player_gameweek"
 PRIMARY_KEY = "uuid"
-
-
-@dataclass
-class ProcessingState:
-    """Tracks state across player processing iterations."""
-
-    table_created: bool = False
-    total_rows: int = 0
-
-
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean and prepare DataFrame for database insertion."""
-    df = df.convert_dtypes()
-
-    for col in df.select_dtypes(include=np.number).columns:
-        df[col] = df[col].fillna(0)
-
-    return df.fillna("")
 
 
 def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.DataFrame | None:
@@ -42,10 +23,8 @@ def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.
         return None
 
     df = pd.DataFrame(history)
-
     df = add_id_column(df, source_columns=["element", "round"], id_column_name=PRIMARY_KEY)
-    df = clean_dataframe(df)
-    df = reorder_columns(df, [PRIMARY_KEY])
+    df = prepare_for_insert(df, PRIMARY_KEY)
 
     return df
 
@@ -63,9 +42,14 @@ def main(schema: str) -> None:
 
     # Filter to only selectable players who have played this season
     players = [p for p in all_players if p.get("minutes", 0) > 0 and p.get("can_select", False)]
-    logger.info("Processing %s selectable players with minutes > 0 (%s total)", len(players), len(all_players))
+    logger.info(
+        "Processing %s selectable players with minutes > 0 (%s total)",
+        len(players),
+        len(all_players),
+    )
 
-    state = ProcessingState()
+    table_created = False
+    total_rows = 0
     total_players = len(players)
 
     for idx, player in enumerate[dict[str, Any]](players):
@@ -91,13 +75,13 @@ def main(schema: str) -> None:
             if history_df is None:
                 continue
 
-            if not state.table_created:
+            if not table_created:
                 columns = build_table_columns_from_df(history_df, PRIMARY_KEY)
                 db.create_table(schema, TABLE_NAME, columns)
-                state.table_created = True
+                table_created = True
 
             insert_dataframe_rows(db, schema, TABLE_NAME, history_df, PRIMARY_KEY)
-            state.total_rows += len(history_df)
+            total_rows += len(history_df)
 
         except Exception as e:
             logger.error("Error processing %s (id=%s): %s", player_name, player_id, e)
@@ -105,7 +89,7 @@ def main(schema: str) -> None:
     db.close()
 
     logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s players, %s total gameweek rows", total_players, state.total_rows)
+    logger.info("Completed: %s players, %s total gameweek rows", total_players, total_rows)
     logger.info("Table: %s.%s", schema, TABLE_NAME)
     logger.info("=" * 60)
 

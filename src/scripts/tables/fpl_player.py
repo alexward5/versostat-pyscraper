@@ -1,35 +1,18 @@
 import argparse
-import json
 
-import numpy as np
 import pandas as pd
 
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
+from ...utils.df_utils import prepare_for_insert, serialize_nested_data
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
-from ..helpers import insert_dataframe_rows, reorder_columns
+from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 
 TABLE_NAME = "fpl_player"
 PRIMARY_KEY = "id"
-
-
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean and prepare DataFrame for database insertion."""
-    # Detect nested dict/list columns by checking first value, then serialize to JSON
-    for col in df.columns:
-        non_null = df[col].dropna()
-        if len(non_null) > 0 and isinstance(non_null.iloc[0], (dict, list)):
-            df[col] = df[col].apply(json.dumps)
-
-    df = df.convert_dtypes()
-
-    for col in df.select_dtypes(include=np.number).columns:
-        df[col] = df[col].fillna(0)
-
-    return df.fillna("")
 
 
 def main(schema: str) -> None:
@@ -49,15 +32,17 @@ def main(schema: str) -> None:
 
     # Filter to only selectable players who have played this season
     players = [p for p in all_players if p.get("minutes", 0) > 0 and p.get("can_select", False)]
-    logger.info("Retrieved %s players (%s selectable with minutes > 0)", len(all_players), len(players))
+    logger.info(
+        "Retrieved %s players (%s selectable with minutes > 0)", len(all_players), len(players)
+    )
 
     df = pd.DataFrame(players)
 
     # Add team_name column by mapping team id to team name
     df["team_name"] = df["team"].map(team_id_to_name)
 
-    df = clean_dataframe(df)
-    df = reorder_columns(df, [PRIMARY_KEY])
+    df = serialize_nested_data(df)
+    df = prepare_for_insert(df, PRIMARY_KEY)
 
     columns = build_table_columns_from_df(df, PRIMARY_KEY)
     db.create_table(schema, TABLE_NAME, columns)
