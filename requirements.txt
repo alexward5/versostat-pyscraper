@@ -1,8 +1,5 @@
 # packages
 python-dotenv
-beautifulsoup4
-lxml
-zenrows
 pandas
 psycopg2-binary
 rapidfuzz
@@ -11,5 +8,4 @@ requests
 # dev-packages
 black
 pyright
-types-beautifulsoup4
 pandas-stubs

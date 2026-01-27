@@ -1,6 +1,6 @@
 # VersoStat PyScraper
 
-Python scripts for scraping sports data sources (fbref, FPL) and loading
+Python scripts for scraping sports data sources (FPL, Sportmonks) and loading
 them into Postgres, plus scripts to create database views.
 
 ## Setup
