@@ -1,13 +1,13 @@
 import argparse
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
-from ...utils.df_utils import add_id_column, reorder_columns
+from ...utils.df_utils import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import setup_logger
 from ...utils import insert_dataframe_rows
 
@@ -17,26 +17,14 @@ TABLE_NAME = "fpl_player_gameweek"
 PRIMARY_KEY = "uuid"
 
 
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean and prepare DataFrame for database insertion."""
-    df = df.convert_dtypes()
-
-    for col in df.select_dtypes(include=np.number).columns:
-        df[col] = df[col].fillna(0)
-
-    return df.fillna("")
-
-
 def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.DataFrame | None:
     """Process a single player's gameweek history into a DataFrame."""
     if not history:
         return None
 
     df = pd.DataFrame(history)
-
     df = add_id_column(df, source_columns=["element", "round"], id_column_name=PRIMARY_KEY)
-    df = clean_dataframe(df)
-    df = reorder_columns(df, [PRIMARY_KEY])
+    df = prepare_for_insert(df, PRIMARY_KEY)
 
     return df
 

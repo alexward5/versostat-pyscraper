@@ -1,13 +1,11 @@
 import argparse
-import json
 
-import numpy as np
 import pandas as pd
 
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
+from ...utils.df_utils import prepare_for_insert, serialize_nested_data
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
-from ...utils.df_utils import reorder_columns
 from ...utils.logger import setup_logger
 from ...utils import insert_dataframe_rows
 
@@ -15,22 +13,6 @@ logger = setup_logger(__name__)
 
 TABLE_NAME = "fpl_events"
 PRIMARY_KEY = "id"
-
-
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean and prepare DataFrame for database insertion."""
-    # Detect nested dict/list columns by checking first value, then serialize to JSON
-    for col in df.columns:
-        non_null = df[col].dropna()
-        if len(non_null) > 0 and isinstance(non_null.iloc[0], (dict, list)):
-            df[col] = df[col].apply(json.dumps)
-
-    df = df.convert_dtypes()
-
-    for col in df.select_dtypes(include=np.number).columns:
-        df[col] = df[col].fillna(0)
-
-    return df.fillna("")
 
 
 def main(schema: str) -> None:
@@ -44,8 +26,8 @@ def main(schema: str) -> None:
     logger.info("Retrieved %s events", len(events))
 
     df = pd.DataFrame(events)
-    df = clean_dataframe(df)
-    df = reorder_columns(df, [PRIMARY_KEY])
+    df = serialize_nested_data(df)
+    df = prepare_for_insert(df, PRIMARY_KEY)
 
     columns = build_table_columns_from_df(df, PRIMARY_KEY)
     db.create_table(schema, TABLE_NAME, columns)
