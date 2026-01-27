@@ -7,8 +7,9 @@ import pandas as pd
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils import reorder_columns
 from ...utils.logger import setup_logger
-from ..helpers import insert_dataframe_rows, reorder_columns
+from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 

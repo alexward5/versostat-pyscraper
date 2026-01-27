@@ -7,8 +7,9 @@ import pandas as pd
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils import reorder_columns
 from ...utils.logger import setup_logger
-from ..helpers import insert_dataframe_rows, reorder_columns
+from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 
@@ -49,7 +50,9 @@ def main(schema: str) -> None:
 
     # Filter to only selectable players who have played this season
     players = [p for p in all_players if p.get("minutes", 0) > 0 and p.get("can_select", False)]
-    logger.info("Retrieved %s players (%s selectable with minutes > 0)", len(all_players), len(players))
+    logger.info(
+        "Retrieved %s players (%s selectable with minutes > 0)", len(all_players), len(players)
+    )
 
     df = pd.DataFrame(players)
 

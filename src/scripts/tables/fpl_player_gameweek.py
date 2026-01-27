@@ -7,10 +7,10 @@ import pandas as pd
 
 from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
-from ...utils.df_utils.add_id_column import add_id_column
+from ...utils.df_utils import add_id_column, reorder_columns
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
-from ..helpers import insert_dataframe_rows, reorder_columns
+from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 
@@ -63,7 +63,11 @@ def main(schema: str) -> None:
 
     # Filter to only selectable players who have played this season
     players = [p for p in all_players if p.get("minutes", 0) > 0 and p.get("can_select", False)]
-    logger.info("Processing %s selectable players with minutes > 0 (%s total)", len(players), len(all_players))
+    logger.info(
+        "Processing %s selectable players with minutes > 0 (%s total)",
+        len(players),
+        len(all_players),
+    )
 
     state = ProcessingState()
     total_players = len(players)
