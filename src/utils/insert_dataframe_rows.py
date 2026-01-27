@@ -1,12 +1,13 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from ...classes.PostgresClient import PostgresClient
+if TYPE_CHECKING:
+    from ..classes.PostgresClient import PostgresClient
 
 
 def insert_dataframe_rows(
-    db: PostgresClient, schema: str, table_name: str, df: pd.DataFrame, primary_key: str
+    db: "PostgresClient", schema: str, table_name: str, df: pd.DataFrame, primary_key: str
 ) -> None:
     """Insert all rows from a dataframe into the database."""
     columns = list[str](df.columns)

@@ -6,6 +6,7 @@ zenrows
 pandas
 psycopg2-binary
 rapidfuzz
+requests
 
 # dev-packages
 black
