@@ -8,7 +8,7 @@ from ..utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-class FPL_API:
+class FantasyPremierLeagueAPI:
     """Client for the Fantasy Premier League API."""
 
     BASE_URL = "https://fantasy.premierleague.com/api"

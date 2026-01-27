@@ -2,7 +2,7 @@ import argparse
 
 import pandas as pd
 
-from ...classes.FPL_API import FPL_API
+from ...classes.FantasyPremierLeagueAPI import FantasyPremierLeagueAPI
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils import prepare_for_insert, serialize_nested_data
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
@@ -21,9 +21,9 @@ def main(schema: str) -> None:
     db = PostgresClient()
     db.create_schema(schema)
 
-    api = FPL_API()
+    fpl_api = FantasyPremierLeagueAPI()
     logger.info("Fetching events from FPL API...")
-    events = api.get_events()
+    events = fpl_api.get_events()
     logger.info("Retrieved %s events", len(events))
 
     df = pd.DataFrame(events)

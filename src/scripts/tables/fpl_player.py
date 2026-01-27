@@ -2,7 +2,7 @@ import argparse
 
 import pandas as pd
 
-from ...classes.FPL_API import FPL_API
+from ...classes.FantasyPremierLeagueAPI import FantasyPremierLeagueAPI
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils import prepare_for_insert, serialize_nested_data
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
@@ -21,13 +21,13 @@ def main(schema: str) -> None:
     db = PostgresClient()
     db.create_schema(schema)
 
-    api = FPL_API()
+    fpl_api = FantasyPremierLeagueAPI()
     logger.info("Fetching players from FPL API...")
-    all_players = api.get_players()
+    all_players = fpl_api.get_players()
 
     # Fetch teams to create team id -> team name mapping
     logger.info("Fetching teams from FPL API...")
-    teams = api.get_teams()
+    teams = fpl_api.get_teams()
     team_id_to_name: dict[int, str] = {t["id"]: t["name"] for t in teams}
     logger.info("Built team mapping for %s teams", len(team_id_to_name))
 
