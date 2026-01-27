@@ -5,6 +5,7 @@ import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
+from ...utils.df_utils import standardize_to_date, transform_column
 from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
@@ -54,7 +55,7 @@ def build_player_fixture_row(
 def main(schema: str, limit_fixtures: int | None = None) -> None:
     """Scrape Premier League player fixture stats and load into database."""
     log_script_start(__name__)
-    
+
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -78,7 +79,9 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             continue
 
         if should_log_progress(i + 1, total_fixtures):
-            logger.info("Progress: %s/%s (%d%%)", i + 1, total_fixtures, int((i + 1) / total_fixtures * 100))
+            logger.info(
+                "Progress: %s/%s (%d%%)", i + 1, total_fixtures, int((i + 1) / total_fixtures * 100)
+            )
 
         try:
             fixture_data = api.get_fixture_with_lineups(fixture_id)
@@ -103,6 +106,9 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     logger.info("Building DataFrame from %s records...", len(all_player_fixture_stats))
     df = pd.DataFrame(all_player_fixture_stats)
+
+    df = transform_column(df, "fixture_date", standardize_to_date)
+
     df = prepare_for_insert(df, PRIMARY_KEY)
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])
@@ -119,7 +125,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         schema=schema,
         table_name=TABLE_NAME,
         total_fixtures=len(fixtures),
-        total_player_fixture_rows=len(df)
+        total_player_fixture_rows=len(df),
     )
 
 

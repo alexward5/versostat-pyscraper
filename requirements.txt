@@ -1,5 +1,6 @@
 # packages
 python-dotenv
+python-dateutil
 pandas
 psycopg2-binary
 rapidfuzz

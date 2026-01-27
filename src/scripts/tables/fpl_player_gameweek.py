@@ -5,7 +5,7 @@ import pandas as pd
 
 from ...classes.FantasyPremierLeagueAPI import FantasyPremierLeagueAPI
 from ...classes.PostgresClient import PostgresClient
-from ...utils.df_utils import add_id_column
+from ...utils.df_utils import add_id_column, standardize_to_date, transform_column
 from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
@@ -23,6 +23,7 @@ def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.
 
     df = pd.DataFrame(history)
     df = add_id_column(df, source_columns=["element", "round"], id_column_name=PRIMARY_KEY)
+    df = transform_column(df, "kickoff_time", standardize_to_date)
     df = prepare_for_insert(df, PRIMARY_KEY)
 
     return df
