@@ -13,7 +13,7 @@ from ...utils.logger import log_script_complete, log_script_start, setup_logger,
 logger = setup_logger(__name__)
 
 TABLE_NAME = "sm_team_fixtures"
-PRIMARY_KEY = "team_fixture_uuid"
+PRIMARY_KEY = "uuid"
 
 
 def build_team_fixture_row(
@@ -66,7 +66,7 @@ def build_team_fixture_row(
 def main(schema: str, limit_fixtures: int | None = None) -> None:
     """Scrape Premier League team fixture stats and load into database."""
     log_script_start(__name__)
-    
+
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -91,7 +91,9 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             continue
 
         if should_log_progress(i + 1, total_fixtures):
-            logger.info("Progress: %s/%s (%d%%)", i + 1, total_fixtures, int((i + 1) / total_fixtures * 100))
+            logger.info(
+                "Progress: %s/%s (%d%%)", i + 1, total_fixtures, int((i + 1) / total_fixtures * 100)
+            )
 
         try:
             fixture_data = api.get_fixture_with_stats(fixture_id)
@@ -153,7 +155,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         schema=schema,
         table_name=TABLE_NAME,
         total_fixtures=len(fixtures),
-        total_team_fixture_rows=len(df)
+        total_team_fixture_rows=len(df),
     )
 
 

@@ -13,7 +13,7 @@ from ...utils.logger import log_script_complete, log_script_start, setup_logger,
 logger = setup_logger(__name__)
 
 TABLE_NAME = "sm_player_fixtures"
-PRIMARY_KEY = "player_fixture_uuid"
+PRIMARY_KEY = "uuid"
 
 
 def build_player_fixture_row(
