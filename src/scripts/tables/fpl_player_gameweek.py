@@ -8,7 +8,7 @@ from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
-from ...utils.logger import setup_logger
+from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
 
 logger = setup_logger(__name__)
 
@@ -30,6 +30,8 @@ def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.
 
 def main(schema: str) -> None:
     """Fetch FPL player gameweek history and load into database."""
+    log_script_start(__name__)
+    
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -55,13 +57,8 @@ def main(schema: str) -> None:
         player_id: int = player["id"]
         player_name: str = player.get("web_name", f"Player {player_id}")
 
-        if (idx + 1) % 50 == 0 or idx == 0:
-            logger.info_with_newline(
-                "Progress: %s/%s players (%.1f%%)",
-                idx + 1,
-                total_players,
-                (idx + 1) / total_players * 100,
-            )
+        if should_log_progress(idx + 1, total_players):
+            logger.info("Progress: %s/%s (%d%%)", idx + 1, total_players, int((idx + 1) / total_players * 100))
 
         try:
             summary = api.get_player_summary(player_id)
@@ -87,10 +84,13 @@ def main(schema: str) -> None:
 
     db.close()
 
-    logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s players, %s total gameweek rows", total_players, total_rows)
-    logger.info("Table: %s.%s", schema, TABLE_NAME)
-    logger.info("=" * 60)
+    log_script_complete(
+        __name__,
+        schema=schema,
+        table_name=TABLE_NAME,
+        total_players=total_players,
+        total_gameweek_rows=total_rows
+    )
 
 
 if __name__ == "__main__":

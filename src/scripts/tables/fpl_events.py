@@ -6,7 +6,7 @@ from ...classes.FPL_API import FPL_API
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils import prepare_for_insert, serialize_nested_data
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
-from ...utils.logger import setup_logger
+from ...utils.logger import log_script_complete, log_script_start, setup_logger
 
 logger = setup_logger(__name__)
 
@@ -16,6 +16,8 @@ PRIMARY_KEY = "id"
 
 def main(schema: str) -> None:
     """Fetch FPL events (gameweeks) data and load into database."""
+    log_script_start(__name__)
+    
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -35,10 +37,7 @@ def main(schema: str) -> None:
 
     db.close()
 
-    logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s events inserted", len(df))
-    logger.info("Table: %s.%s", schema, TABLE_NAME)
-    logger.info("=" * 60)
+    log_script_complete(__name__, schema=schema, table_name=TABLE_NAME, total_events=len(df))
 
 
 if __name__ == "__main__":

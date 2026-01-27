@@ -5,7 +5,12 @@ import inspect
 from typing import Any, Literal
 
 from src.scripts.tables import crosswalk_player_id, fpl_events, fpl_player, fpl_player_gameweek
-from src.scripts.tables import sm_player_fixtures, sm_player_overall, sm_team_fixtures, sm_team_overall
+from src.scripts.tables import (
+    sm_player_fixtures,
+    sm_player_overall,
+    sm_team_fixtures,
+    sm_team_overall,
+)
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -49,16 +54,13 @@ def run_scripts(
     logger.info("Starting pipeline for schema: %s", schema)
     logger.info("Scripts to run (%s): %s", len(scripts_to_run), scripts_to_run)
     logger.info("=" * 60)
+    logger.newline()
 
     successful: list[str] = []
     failed: list[str] = []
 
     for script_name in scripts_to_run:
         try:
-            logger.info_with_newline("\n" + "=" * 60)
-            logger.info("Running: %s", script_name)
-            logger.info("=" * 60)
-
             script_func = SCRIPT_MAP[script_name]
             sig = inspect.signature(script_func)
             supported_params = set(sig.parameters.keys()) - {"schema"}
@@ -68,26 +70,29 @@ def run_scripts(
 
             script_func(schema, **filtered_kwargs)
             successful.append(script_name)
-            logger.info("✓ Successfully completed: %s", script_name)
+            logger.info_with_newline("✓ Successfully completed: %s", script_name)
 
         except Exception as e:
             failed.append(script_name)
             logger.error("✗ Failed: %s - Error: %s", script_name, str(e))
             logger.exception(e)
 
-    logger.info_with_newline("\n" + "=" * 60)
+    logger.newline()
+    logger.info("=" * 60)
     logger.info("PIPELINE SUMMARY")
     logger.info("=" * 60)
     logger.info("Schema: %s", schema)
-    logger.info("Total: %s | Successful: %s | Failed: %s", len(scripts_to_run), len(successful), len(failed))
+    logger.info(
+        "Total: %s / Successful: %s / Failed: %s", len(scripts_to_run), len(successful), len(failed)
+    )
 
     if successful:
-        logger.info("\nSuccessful scripts:")
+        logger.info("Successful scripts:")
         for script in successful:
             logger.info("  ✓ %s", script)
 
     if failed:
-        logger.info("\nFailed scripts:")
+        logger.info("Failed scripts:")
         for script in failed:
             logger.info("  ✗ %s", script)
 
@@ -107,12 +112,18 @@ def main() -> None:
         default=["all"],
         help='Scripts to run: "all", "fpl", "sm", or specific names',
     )
-    parser.add_argument("--limit-fixtures", type=int, help="Limit fixtures (for SM fixture scripts)")
+    parser.add_argument(
+        "--limit-fixtures", type=int, help="Limit fixtures (for SM fixture scripts)"
+    )
     parser.add_argument("--limit-teams", type=int, help="Limit teams (for SM overall scripts)")
 
     args = parser.parse_args()
 
-    scripts_param = args.scripts[0] if len(args.scripts) == 1 and args.scripts[0] in ["all", "fpl", "sm"] else args.scripts
+    scripts_param = (
+        args.scripts[0]
+        if len(args.scripts) == 1 and args.scripts[0] in ["all", "fpl", "sm"]
+        else args.scripts
+    )
 
     kwargs = {}
     if args.limit_fixtures is not None:

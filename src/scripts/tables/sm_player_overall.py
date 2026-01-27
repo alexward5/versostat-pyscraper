@@ -6,7 +6,7 @@ from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
-from ...utils.logger import setup_logger
+from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
 
 logger = setup_logger(__name__)
 
@@ -16,6 +16,8 @@ PRIMARY_KEY = "player_id"
 
 def main(schema: str, limit_teams: int | None = None) -> None:
     """Scrape Premier League player overall stats and load into database."""
+    log_script_start(__name__)
+    
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -26,21 +28,23 @@ def main(schema: str, limit_teams: int | None = None) -> None:
         teams = teams[:limit_teams]
         logger.info("Limited to first %s teams for testing", limit_teams)
 
-    logger.info("Processing %s teams", len(teams))
+    total_teams = len(teams)
+    logger.info("Processing %s teams", total_teams)
 
     all_player_stats: list[dict[str, object]] = []
 
-    for team in teams:
+    for idx, team in enumerate(teams):
         team_id = team.get("id")
         team_name = team.get("name", "Unknown")
-        logger.info_with_newline("Processing team: %s (ID: %s)...", team_name, team_id)
+
+        if should_log_progress(idx + 1, total_teams):
+            logger.info("Progress: %s/%s (%d%%)", idx + 1, total_teams, int((idx + 1) / total_teams * 100))
 
         if not team_id:
             logger.warning("Skipping team with no ID")
             continue
 
         players = api.get_players_by_team(team_id)
-        logger.info("Found %s players for %s", len(players), team_name)
 
         for player in players:
             player_id = player.get("player_id")
@@ -55,7 +59,6 @@ def main(schema: str, limit_teams: int | None = None) -> None:
                 player_stats["season_id"] = api.current_season_id
 
                 all_player_stats.append(player_stats)
-                logger.info("  Processed player: %s", player_stats.get("player_name", player_id))
 
             except Exception as e:
                 logger.error("Error processing player %s: %s", player_id, e)
@@ -78,10 +81,13 @@ def main(schema: str, limit_teams: int | None = None) -> None:
 
     db.close()
 
-    logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s teams, %s player rows", len(teams), len(df))
-    logger.info("Table: %s.%s", schema, TABLE_NAME)
-    logger.info("=" * 60)
+    log_script_complete(
+        __name__,
+        schema=schema,
+        table_name=TABLE_NAME,
+        total_teams=len(teams),
+        total_player_rows=len(df)
+    )
 
 
 if __name__ == "__main__":

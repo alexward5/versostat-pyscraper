@@ -191,8 +191,6 @@ class SportmonksAPI:
 
     def get_players_by_team(self, team_id: int) -> list[dict[str, Any]]:
         """Get all players for a team in the current season."""
-        logger.info("Fetching players for team ID: %s", team_id)
-
         response = self._make_request(
             f"/teams/{team_id}",
             params={
@@ -203,7 +201,6 @@ class SportmonksAPI:
 
         data = response.get("data", {})
         players: list[dict[str, Any]] = data.get("players", [])
-        logger.info("Found %s players for team %s", len(players), team_id)
         return players
 
     def get_player_statistics(self, player_id: int) -> dict[str, Any]:
