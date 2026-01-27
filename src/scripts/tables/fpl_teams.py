@@ -1,0 +1,47 @@
+import argparse
+
+import pandas as pd
+
+from ...classes.FantasyPremierLeagueAPI import FantasyPremierLeagueAPI
+from ...classes.PostgresClient import PostgresClient
+from ...utils.df_utils import prepare_for_insert, serialize_nested_data
+from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.logger import log_script_complete, log_script_start, setup_logger
+
+logger = setup_logger(__name__)
+
+TABLE_NAME = "fpl_teams"
+PRIMARY_KEY = "id"
+
+
+def main(schema: str) -> None:
+    """Fetch FPL teams data and load into database."""
+    log_script_start(__name__)
+    
+    db = PostgresClient()
+    db.create_schema(schema)
+
+    fpl_api = FantasyPremierLeagueAPI()
+    logger.info("Fetching teams from FPL API...")
+    teams = fpl_api.get_teams()
+    logger.info("Retrieved %s teams", len(teams))
+
+    df = pd.DataFrame(teams)
+    df = serialize_nested_data(df)
+    df = prepare_for_insert(df, PRIMARY_KEY)
+
+    columns = build_table_columns_from_df(df, PRIMARY_KEY)
+    db.create_table(schema, TABLE_NAME, columns)
+
+    db.insert_dataframe(schema, TABLE_NAME, df, PRIMARY_KEY)
+
+    db.close()
+
+    log_script_complete(__name__, schema=schema, table_name=TABLE_NAME, total_teams=len(df))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Fetch FPL teams data")
+    parser.add_argument("--schema", type=str, required=True, help="Database schema name to use")
+    args = parser.parse_args()
+    main(args.schema)

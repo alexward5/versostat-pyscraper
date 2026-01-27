@@ -2,7 +2,7 @@ import argparse
 import inspect
 from typing import Any, Literal
 
-from src.scripts.tables import crosswalk_player_id, fpl_events, fpl_player, fpl_player_gameweek
+from src.scripts.tables import crosswalk_player_id, fpl_events, fpl_player, fpl_player_gameweek, fpl_teams
 from src.scripts.tables import (
     sm_player_fixtures,
     sm_player_overall,
@@ -17,6 +17,7 @@ SCRIPT_MAP = {
     "fpl_events": fpl_events.main,
     "fpl_player": fpl_player.main,
     "fpl_player_gameweek": fpl_player_gameweek.main,
+    "fpl_teams": fpl_teams.main,
     "sm_player_fixtures": sm_player_fixtures.main,
     "sm_player_overall": sm_player_overall.main,
     "sm_team_fixtures": sm_team_fixtures.main,
@@ -24,7 +25,7 @@ SCRIPT_MAP = {
     "crosswalk_player_id": crosswalk_player_id.main,
 }
 
-FPL_SCRIPTS = ["fpl_events", "fpl_player", "fpl_player_gameweek"]
+FPL_SCRIPTS = ["fpl_events", "fpl_player", "fpl_player_gameweek", "fpl_teams"]
 SM_SCRIPTS = ["sm_player_fixtures", "sm_player_overall", "sm_team_fixtures", "sm_team_overall"]
 ALL_SCRIPTS = FPL_SCRIPTS + SM_SCRIPTS + ["crosswalk_player_id"]
 
