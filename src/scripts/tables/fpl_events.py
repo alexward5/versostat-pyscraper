@@ -5,7 +5,7 @@ import pandas as pd
 from ...classes.FantasyPremierLeagueAPI import FantasyPremierLeagueAPI
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils import prepare_for_insert, serialize_nested_data
-from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.logger import log_script_complete, log_script_start, setup_logger
 
 logger = setup_logger(__name__)
@@ -30,8 +30,8 @@ def main(schema: str) -> None:
     df = serialize_nested_data(df)
     df = prepare_for_insert(df, PRIMARY_KEY)
 
-    columns = build_table_columns_from_df(df, PRIMARY_KEY)
-    db.create_table(schema, TABLE_NAME, columns)
+    column_definitions = generate_column_definitions(df, PRIMARY_KEY)
+    db.create_table(schema, TABLE_NAME, column_definitions)
 
     db.insert_dataframe(schema, TABLE_NAME, df, PRIMARY_KEY)
 

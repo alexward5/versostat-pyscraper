@@ -3,8 +3,12 @@ import pandas as pd
 from src.utils.pg_utils.map_pandas_dtype_to_postgres import map_pandas_dtype_to_postgres
 
 
-def build_table_columns_from_df(df: pd.DataFrame, primary_key: str) -> list[str]:
-    """Build PostgreSQL column definitions from a DataFrame schema."""
+def generate_column_definitions(df: pd.DataFrame, primary_key: str) -> list[str]:
+    """Generate PostgreSQL column definition strings from a DataFrame schema.
+    
+    Returns a list of column definition strings like:
+    ["id INTEGER NOT NULL PRIMARY KEY", "name TEXT NOT NULL"]
+    """
     columns: list[str] = []
 
     for col_name in df.columns:

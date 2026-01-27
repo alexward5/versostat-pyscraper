@@ -6,7 +6,7 @@ import pandas as pd
 from ...classes.FantasyPremierLeagueAPI import FantasyPremierLeagueAPI
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils import add_id_column
-from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
 
@@ -72,8 +72,8 @@ def main(schema: str) -> None:
                 continue
 
             if not table_created:
-                columns = build_table_columns_from_df(history_df, PRIMARY_KEY)
-                db.create_table(schema, TABLE_NAME, columns)
+                column_definitions = generate_column_definitions(history_df, PRIMARY_KEY)
+                db.create_table(schema, TABLE_NAME, column_definitions)
                 table_created = True
 
             db.insert_dataframe(schema, TABLE_NAME, history_df, PRIMARY_KEY)

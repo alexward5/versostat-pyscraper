@@ -5,7 +5,7 @@ import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
-from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
 
@@ -137,8 +137,8 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])
 
-    columns = build_table_columns_from_df(df, PRIMARY_KEY)
-    db.create_table(schema, TABLE_NAME, columns)
+    column_definitions = generate_column_definitions(df, PRIMARY_KEY)
+    db.create_table(schema, TABLE_NAME, column_definitions)
 
     db.insert_dataframe(schema, TABLE_NAME, df, PRIMARY_KEY)
 

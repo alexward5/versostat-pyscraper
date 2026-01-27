@@ -6,7 +6,7 @@ import pandas as pd
 from rapidfuzz import fuzz, process  # type: ignore[import-untyped]
 
 from ...classes.PostgresClient import PostgresClient
-from ...utils.df_utils.build_table_columns import build_table_columns_from_df
+from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -275,10 +275,10 @@ def main(schema: str) -> None:
 
     # Create and populate crosswalk table
     crosswalk_df = pd.DataFrame(crosswalk_rows)
-    columns = build_table_columns_from_df(crosswalk_df, PRIMARY_KEY)
+    column_definitions = generate_column_definitions(crosswalk_df, PRIMARY_KEY)
 
     db.drop_table(schema, TABLE_NAME)
-    db.create_table(schema, TABLE_NAME, columns)
+    db.create_table(schema, TABLE_NAME, column_definitions)
     db.insert_dataframe(schema, TABLE_NAME, crosswalk_df, PRIMARY_KEY)
 
     db.close()
