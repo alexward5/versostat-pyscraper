@@ -1,5 +1,3 @@
-"""Run table scraping scripts to load data into PostgreSQL."""
-
 import argparse
 import inspect
 from typing import Any, Literal
