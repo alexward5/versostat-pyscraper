@@ -54,7 +54,7 @@ def run_scripts(
     logger.info("Starting pipeline for schema: %s", schema)
     logger.info("Scripts to run (%s): %s", len(scripts_to_run), scripts_to_run)
     logger.info("=" * 60)
-    print()
+    logger.newline()
 
     successful: list[str] = []
     failed: list[str] = []
@@ -77,7 +77,7 @@ def run_scripts(
             logger.error("✗ Failed: %s - Error: %s", script_name, str(e))
             logger.exception(e)
 
-    print()
+    logger.newline()
     logger.info("=" * 60)
     logger.info("PIPELINE SUMMARY")
     logger.info("=" * 60)

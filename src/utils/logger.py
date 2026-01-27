@@ -36,6 +36,10 @@ class LoggerWithNewline(logging.Logger):
         kwargs["extra"]["newline_before"] = True
         self.debug(msg, *args, **kwargs)
 
+    def newline(self) -> None:
+        """Print an empty line."""
+        print()
+
 
 def setup_logger(name: str) -> LoggerWithNewline:
     logging.setLoggerClass(LoggerWithNewline)
