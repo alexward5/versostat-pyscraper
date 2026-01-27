@@ -2,6 +2,7 @@ import os
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
 
+import pandas as pd
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
@@ -145,6 +146,24 @@ class PostgresClient:
 
         with self._cursor() as cur:
             cur.execute(query, row_values)
+
+    def insert_dataframe(
+        self,
+        schema: str,
+        table_name: str,
+        df: pd.DataFrame,
+        primary_key: str,
+    ) -> None:
+        """Insert all rows from a dataframe into the database."""
+        columns = list[str](df.columns)
+        for _, row in df.iterrows():
+            self.insert_row(
+                schema=schema,
+                table_name=table_name,
+                column_names=columns,
+                row_values=list[Any](row),
+                update_on=primary_key,
+            )
 
     def query_table(
         self,

@@ -8,7 +8,6 @@ from rapidfuzz import fuzz, process  # type: ignore[import-untyped]
 from ...classes.PostgresClient import PostgresClient
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.logger import setup_logger
-from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 
@@ -280,7 +279,7 @@ def main(schema: str) -> None:
 
     db.drop_table(schema, TABLE_NAME)
     db.create_table(schema, TABLE_NAME, columns)
-    insert_dataframe_rows(db, schema, TABLE_NAME, crosswalk_df, PRIMARY_KEY)
+    db.insert_dataframe(schema, TABLE_NAME, crosswalk_df, PRIMARY_KEY)
 
     db.close()
 

@@ -9,7 +9,6 @@ from ...utils.df_utils import add_id_column
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import setup_logger
-from ...utils import insert_dataframe_rows
 
 logger = setup_logger(__name__)
 
@@ -80,7 +79,7 @@ def main(schema: str) -> None:
                 db.create_table(schema, TABLE_NAME, columns)
                 table_created = True
 
-            insert_dataframe_rows(db, schema, TABLE_NAME, history_df, PRIMARY_KEY)
+            db.insert_dataframe(schema, TABLE_NAME, history_df, PRIMARY_KEY)
             total_rows += len(history_df)
 
         except Exception as e:
