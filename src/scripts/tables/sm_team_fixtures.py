@@ -5,6 +5,7 @@ import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
+from ...utils.df_utils import add_id_column, standardize_to_date, transform_column
 from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
@@ -12,7 +13,7 @@ from ...utils.logger import log_script_complete, log_script_start, setup_logger,
 logger = setup_logger(__name__)
 
 TABLE_NAME = "sm_team_fixtures"
-PRIMARY_KEY = "team_fixture_id"
+PRIMARY_KEY = "team_fixture_uuid"
 
 
 def build_team_fixture_row(
@@ -28,7 +29,6 @@ def build_team_fixture_row(
     fixture_id = fixture_data.get("id")
 
     row: dict[str, Any] = {
-        "team_fixture_id": f"{team_id}_{fixture_id}",
         "team_id": team_id,
         "team_name": team_name,
         "fixture_id": fixture_id,
@@ -133,6 +133,10 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     logger.info("Building DataFrame from %s records...", len(all_team_fixture_stats))
     df = pd.DataFrame(all_team_fixture_stats)
+
+    df = add_id_column(df, source_columns=["team_id", "fixture_id"], id_column_name=PRIMARY_KEY)
+    df = transform_column(df, "fixture_date", standardize_to_date)
+
     df = prepare_for_insert(df, PRIMARY_KEY)
 
     logger.info("DataFrame columns (%s): %s", len(df.columns), list(df.columns)[:15])

@@ -5,7 +5,7 @@ import pandas as pd
 
 from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
-from ...utils.df_utils import standardize_to_date, transform_column
+from ...utils.df_utils import add_id_column, standardize_to_date, transform_column
 from ...utils.df_utils.build_table_columns import generate_column_definitions
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
 from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
@@ -13,7 +13,7 @@ from ...utils.logger import log_script_complete, log_script_start, setup_logger,
 logger = setup_logger(__name__)
 
 TABLE_NAME = "sm_player_fixtures"
-PRIMARY_KEY = "player_fixture_id"
+PRIMARY_KEY = "player_fixture_uuid"
 
 
 def build_player_fixture_row(
@@ -32,7 +32,6 @@ def build_player_fixture_row(
     team_name = participants.get(team_id, "") if team_id is not None else ""
 
     row: dict[str, Any] = {
-        "player_fixture_id": f"{player_id}_{fixture_id}",
         "player_id": player_id,
         "player_name": lineup.get("player_name", ""),
         "team_id": team_id,
@@ -107,6 +106,7 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
     logger.info("Building DataFrame from %s records...", len(all_player_fixture_stats))
     df = pd.DataFrame(all_player_fixture_stats)
 
+    df = add_id_column(df, source_columns=["player_id", "fixture_id"], id_column_name=PRIMARY_KEY)
     df = transform_column(df, "fixture_date", standardize_to_date)
 
     df = prepare_for_insert(df, PRIMARY_KEY)
