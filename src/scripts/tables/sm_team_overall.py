@@ -1,3 +1,6 @@
+from typing import Any
+
+
 import argparse
 
 import pandas as pd
@@ -17,7 +20,7 @@ PRIMARY_KEY = "team_id"
 def main(schema: str, limit_teams: int | None = None) -> None:
     """Scrape Premier League team overall stats and load into database."""
     log_script_start(__name__)
-    
+
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -33,12 +36,13 @@ def main(schema: str, limit_teams: int | None = None) -> None:
 
     all_team_stats: list[dict[str, object]] = []
 
-    for idx, team in enumerate(teams):
+    for idx, team in enumerate[dict[str, Any]](teams):
         team_id = team.get("id")
-        team_name = team.get("name", "Unknown")
 
         if should_log_progress(idx + 1, total_teams):
-            logger.info("Progress: %s/%s (%d%%)", idx + 1, total_teams, int((idx + 1) / total_teams * 100))
+            logger.info(
+                "Progress: %s/%s (%d%%)", idx + 1, total_teams, int((idx + 1) / total_teams * 100)
+            )
 
         if not team_id:
             logger.warning("Skipping team with no ID")
@@ -73,11 +77,7 @@ def main(schema: str, limit_teams: int | None = None) -> None:
     db.close()
 
     log_script_complete(
-        __name__,
-        schema=schema,
-        table_name=TABLE_NAME,
-        total_teams=len(teams),
-        total_rows=len(df)
+        __name__, schema=schema, table_name=TABLE_NAME, total_teams=len(teams), total_rows=len(df)
     )
 
 
