@@ -49,16 +49,13 @@ def run_scripts(
     logger.info("Starting pipeline for schema: %s", schema)
     logger.info("Scripts to run (%s): %s", len(scripts_to_run), scripts_to_run)
     logger.info("=" * 60)
+    print()
 
     successful: list[str] = []
     failed: list[str] = []
 
     for script_name in scripts_to_run:
         try:
-            logger.info_with_newline("\n" + "=" * 60)
-            logger.info("Running: %s", script_name)
-            logger.info("=" * 60)
-
             script_func = SCRIPT_MAP[script_name]
             sig = inspect.signature(script_func)
             supported_params = set(sig.parameters.keys()) - {"schema"}
@@ -68,14 +65,15 @@ def run_scripts(
 
             script_func(schema, **filtered_kwargs)
             successful.append(script_name)
-            logger.info("✓ Successfully completed: %s", script_name)
+            logger.info_with_newline("✓ Successfully completed: %s", script_name)
 
         except Exception as e:
             failed.append(script_name)
             logger.error("✗ Failed: %s - Error: %s", script_name, str(e))
             logger.exception(e)
 
-    logger.info_with_newline("\n" + "=" * 60)
+    print()
+    logger.info("=" * 60)
     logger.info("PIPELINE SUMMARY")
     logger.info("=" * 60)
     logger.info("Schema: %s", schema)

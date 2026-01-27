@@ -25,7 +25,6 @@ class FPL_API:
         elapsed = time.time() - self._last_request_time
         if elapsed < self.RATE_LIMIT_SECONDS:
             wait_time = self.RATE_LIMIT_SECONDS - elapsed
-            logger.info("Rate limit: waiting %.1fs before next request...", wait_time)
             time.sleep(wait_time)
 
     def _fetch_json(self, endpoint: str, retries: int = 3) -> dict[str, Any]:

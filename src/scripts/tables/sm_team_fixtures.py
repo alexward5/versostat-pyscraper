@@ -7,7 +7,7 @@ from ...classes.PostgresClient import PostgresClient
 from ...classes.SportmonksAPI import SportmonksAPI
 from ...utils.df_utils.build_table_columns import build_table_columns_from_df
 from ...utils.df_utils.prepare_for_insert import prepare_for_insert
-from ...utils.logger import setup_logger
+from ...utils.logger import log_script_complete, log_script_start, setup_logger, should_log_progress
 
 logger = setup_logger(__name__)
 
@@ -65,6 +65,8 @@ def build_team_fixture_row(
 
 def main(schema: str, limit_fixtures: int | None = None) -> None:
     """Scrape Premier League team fixture stats and load into database."""
+    log_script_start(__name__)
+    
     db = PostgresClient()
     db.create_schema(schema)
 
@@ -77,7 +79,8 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         db.close()
         return
 
-    logger.info("Processing %s completed fixtures", len(fixtures))
+    total_fixtures = len(fixtures)
+    logger.info("Processing %s completed fixtures", total_fixtures)
 
     all_team_fixture_stats: list[dict[str, object]] = []
 
@@ -86,6 +89,9 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
         if not fixture_id:
             continue
+
+        if should_log_progress(i + 1, total_fixtures):
+            logger.info("Progress: %s/%s (%d%%)", i + 1, total_fixtures, int((i + 1) / total_fixtures * 100))
 
         try:
             fixture_data = api.get_fixture_with_stats(fixture_id)
@@ -117,9 +123,6 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
             )
             all_team_fixture_stats.append(away_row)
 
-            if (i + 1) % 10 == 0:
-                logger.info("Processed %s/%s fixtures...", i + 1, len(fixtures))
-
         except Exception as e:
             logger.error("Error processing fixture %s: %s", fixture_id, e)
 
@@ -141,10 +144,13 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
 
     db.close()
 
-    logger.info_with_newline("=" * 60)
-    logger.info("Completed: %s fixtures, %s team-fixture rows", len(fixtures), len(df))
-    logger.info("Table: %s.%s", schema, TABLE_NAME)
-    logger.info("=" * 60)
+    log_script_complete(
+        __name__,
+        schema=schema,
+        table_name=TABLE_NAME,
+        total_fixtures=len(fixtures),
+        total_team_fixture_rows=len(df)
+    )
 
 
 if __name__ == "__main__":
