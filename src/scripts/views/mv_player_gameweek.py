@@ -48,7 +48,7 @@ def main(schema: str) -> None:
             END as calc_xgap
         FROM {schema}.fpl_player_gameweek fpl_player_gameweek
         JOIN {schema}.crosswalk_player_id crosswalk_player_id
-            ON fpl_player_gameweek.element = crosswalk_player_id.fpl_player_id
+            ON fpl_player_gameweek.element::text = crosswalk_player_id.fpl_player_id
         JOIN {schema}.fpl_player fpl_player
             ON crosswalk_player_id.fpl_player_id = fpl_player.id
         JOIN {schema}.sm_player_fixtures sm_player_fixtures
