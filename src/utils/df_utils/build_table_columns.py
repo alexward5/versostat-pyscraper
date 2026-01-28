@@ -15,6 +15,8 @@ def generate_column_definitions(df: pd.DataFrame, primary_key: str) -> list[str]
         col_name_str: str = str(col_name)
         dtype = df[col_name_str].dtype
         pg_type = map_pandas_dtype_to_postgres(dtype)
+        if col_name_str == primary_key:
+            pg_type = "TEXT"
 
         col_def = f"{col_name_str} {pg_type} NOT NULL"
 
