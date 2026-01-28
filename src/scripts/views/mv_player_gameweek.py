@@ -52,7 +52,7 @@ def main(schema: str) -> None:
         JOIN {schema}.fpl_player fpl_player
             ON crosswalk_player_id.fpl_player_id = fpl_player.id
         JOIN {schema}.sm_player_fixtures sm_player_fixtures
-            ON crosswalk_player_id.sm_player_id = sm_player_fixtures.player_id 
+            ON crosswalk_player_id.sm_player_id = sm_player_fixtures.player_id::text
             AND fpl_player_gameweek.kickoff_time = sm_player_fixtures.fixture_date
     """
 
