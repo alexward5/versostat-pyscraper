@@ -9,6 +9,7 @@ from src.scripts.tables import (
     sm_team_fixtures,
     sm_team_overall,
 )
+from src.scripts.views import mv_player_gameweek
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -23,22 +24,28 @@ SCRIPT_MAP = {
     "sm_team_fixtures": sm_team_fixtures.main,
     "sm_team_overall": sm_team_overall.main,
     "crosswalk_player_id": crosswalk_player_id.main,
+    "mv_player_gameweek": mv_player_gameweek.main,
 }
 
 FPL_SCRIPTS = ["fpl_events", "fpl_player", "fpl_player_gameweek", "fpl_teams"]
 SM_SCRIPTS = ["sm_player_fixtures", "sm_player_overall", "sm_team_fixtures", "sm_team_overall"]
-ALL_SCRIPTS = FPL_SCRIPTS + SM_SCRIPTS + ["crosswalk_player_id"]
+VIEW_SCRIPTS = ["mv_player_gameweek"]
+ALL_SCRIPTS = FPL_SCRIPTS + SM_SCRIPTS + ["crosswalk_player_id"] + VIEW_SCRIPTS
 
 
 def run_scripts(
     schema: str,
-    scripts: list[str] | Literal["all", "fpl", "sm"] = "all",
+    scripts: list[str] | Literal["all", "tables", "views", "fpl", "sm"] = "all",
     **kwargs: Any,
 ) -> None:
-    """Run table scraping scripts. Pass 'all', 'fpl', 'sm', or a list of script names."""
+    """Run table/view scripts. Pass 'all', 'tables', 'views', 'fpl', 'sm', or a list of script names."""
     scripts_to_run: list[str]
     if scripts == "all":
         scripts_to_run = ALL_SCRIPTS
+    elif scripts == "tables":
+        scripts_to_run = FPL_SCRIPTS + SM_SCRIPTS + ["crosswalk_player_id"]
+    elif scripts == "views":
+        scripts_to_run = VIEW_SCRIPTS
     elif scripts == "fpl":
         scripts_to_run = FPL_SCRIPTS
     elif scripts == "sm":
@@ -101,7 +108,7 @@ def run_scripts(
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Run table scraping scripts",
+        description="Run table/view scripts",
     )
 
     parser.add_argument("--schema", type=str, required=True, help="Database schema name")
@@ -109,7 +116,7 @@ def main() -> None:
         "--scripts",
         nargs="+",
         default=["all"],
-        help='Scripts to run: "all", "fpl", "sm", or specific names',
+        help='Scripts to run: "all", "tables", "views", "fpl", "sm", or specific names',
     )
     parser.add_argument(
         "--limit-fixtures", type=int, help="Limit fixtures (for SM fixture scripts)"
@@ -120,7 +127,7 @@ def main() -> None:
 
     scripts_param = (
         args.scripts[0]
-        if len(args.scripts) == 1 and args.scripts[0] in ["all", "fpl", "sm"]
+        if len(args.scripts) == 1 and args.scripts[0] in ["all", "tables", "views", "fpl", "sm"]
         else args.scripts
     )
 
