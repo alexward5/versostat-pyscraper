@@ -29,33 +29,39 @@ def prepare_for_insert(df: pd.DataFrame, primary_key: str) -> pd.DataFrame:
             except (ValueError, TypeError):
                 # If conversion fails, keep as string
                 pass
-    
+
     # Attempt to convert string columns that contain numeric values
     for col in df.columns:
         col_str = str(col)
         series = df[col_str]
-        
+
         # Skip columns we already processed or that aren't strings
         if col_str in numeric_cols or not pd.api.types.is_string_dtype(series):
             continue
-        
+
         # Try to convert string columns to numeric
         try:
             # Attempt numeric conversion
-            converted = pd.to_numeric(series, errors='coerce')
-            
+            converted = pd.to_numeric(series, errors="coerce")
+
             # Check if conversion was successful for most values
             # (at least 50% of non-null values should be convertible)
             non_null_count = series.notna().sum()
             if non_null_count > 0:
                 converted_count = converted.notna().sum()
                 if converted_count / non_null_count >= 0.5:
-                    # Determine if it's integer or float
+                    # Determine if it's integer or float. Use float if any value was
+                    # written as a decimal string (e.g. "0.00") or has a fractional part.
                     non_null_converted = converted.dropna()
-                    if len(non_null_converted) > 0 and (non_null_converted % 1 == 0).all():
-                        df[col_str] = converted.astype('Int64')
+                    looks_like_decimal = series.astype(str).str.contains(r"\.", na=False).any()
+                    if (
+                        len(non_null_converted) > 0
+                        and (non_null_converted % 1 == 0).all()
+                        and not looks_like_decimal
+                    ):
+                        df[col_str] = converted.astype("Int64")
                     else:
-                        df[col_str] = converted.astype('Float64')
+                        df[col_str] = converted.astype("Float64")
         except (ValueError, TypeError):
             # If conversion fails, keep as string
             pass
@@ -64,7 +70,7 @@ def prepare_for_insert(df: pd.DataFrame, primary_key: str) -> pd.DataFrame:
     for col in df.columns:
         col_str = str(col)
         series = df[col_str]
-        
+
         dtype_str = str(series.dtype)
         if dtype_str == "boolean":
             df[col_str] = series.fillna(False)
