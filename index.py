@@ -9,7 +9,7 @@ from src.scripts.tables import (
     sm_team_fixtures,
     sm_team_overall,
 )
-from src.scripts.views import mv_player_gameweek
+from src.scripts.views import mv_player, mv_player_gameweek
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -24,12 +24,13 @@ SCRIPT_MAP = {
     "sm_team_fixtures": sm_team_fixtures.main,
     "sm_team_overall": sm_team_overall.main,
     "crosswalk_player_id": crosswalk_player_id.main,
+    "mv_player": mv_player.main,
     "mv_player_gameweek": mv_player_gameweek.main,
 }
 
 FPL_SCRIPTS = ["fpl_events", "fpl_player", "fpl_player_gameweek", "fpl_teams"]
 SM_SCRIPTS = ["sm_player_fixtures", "sm_player_overall", "sm_team_fixtures", "sm_team_overall"]
-VIEW_SCRIPTS = ["mv_player_gameweek"]
+VIEW_SCRIPTS = ["mv_player", "mv_player_gameweek"]
 ALL_SCRIPTS = FPL_SCRIPTS + SM_SCRIPTS + ["crosswalk_player_id"] + VIEW_SCRIPTS
 
 
