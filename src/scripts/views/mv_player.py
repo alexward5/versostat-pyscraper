@@ -36,6 +36,7 @@ def main(schema: str) -> None:
             ROUND(CAST(fpl_player.now_cost AS DECIMAL) / 10, 1) as fpl_player_cost,
             fpl_player.selected_by_percent as fpl_selected_by_percent
         FROM {schema}.fpl_player fpl_player
+        WHERE fpl_player.element_type != 1
     """
 
     logger.info("Creating materialized view: %s.%s", schema, VIEW_NAME)
