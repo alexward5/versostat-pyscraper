@@ -1,5 +1,6 @@
 import os
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterator, Optional
 
 import pandas as pd
@@ -10,7 +11,9 @@ from psycopg2 import sql
 
 from ..utils.logger import setup_logger
 
-load_dotenv(".env.local")
+# Load .env.local only when it exists (ECS uses env vars/secrets directly)
+if Path(".env.local").exists():
+    load_dotenv(".env.local", override=False)
 
 logger = setup_logger(__name__)
 
@@ -25,12 +28,21 @@ class PostgresClient:
         if not self.dbname or not self.user or not self.host or not self.port:
             raise ValueError("Database credentials not found in environment variables")
 
-        self.conn: Any = psycopg2.connect(
-            dbname=self.dbname,
-            user=self.user,
-            host=self.host,
-            port=self.port,
-        )
+        conn_kwargs: dict[str, Any] = {
+            "dbname": self.dbname,
+            "user": self.user,
+            "host": self.host,
+            "port": self.port,
+        }
+
+        sslmode = os.getenv("PGSSLMODE")
+        if sslmode:
+            conn_kwargs["sslmode"] = sslmode
+            sslrootcert = os.getenv("PGSSLROOTCERT")
+            if sslrootcert:
+                conn_kwargs["sslrootcert"] = sslrootcert
+
+        self.conn = psycopg2.connect(**conn_kwargs)
 
     def close(self) -> None:
         if self.conn and not self.conn.closed:

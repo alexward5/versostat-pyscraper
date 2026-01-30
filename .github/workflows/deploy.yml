@@ -1,0 +1,74 @@
+name: Deploy Pyscraper (prod)
+
+on:
+    push:
+        branches: [main]
+    workflow_dispatch: {}
+
+concurrency:
+    group: deploy-pyscraper-prod
+    cancel-in-progress: false
+
+permissions:
+    id-token: write
+    contents: read
+
+env:
+    AWS_REGION: us-east-1
+    ROLE_ARN: arn:aws:iam::586999013151:role/VersoStat-GHADeployRole
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Configure AWS credentials (OIDC)
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: ${{ env.ROLE_ARN }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Discover ECR repo URI (pyscraper)
+              id: ecr
+              run: |
+                  REPO_URI=$(aws cloudformation list-exports --region "$AWS_REGION" \
+                    --query "Exports[?Name=='VersoStat-PyscraperEcrRepositoryUri'].Value" --output text)
+                  if [ -z "$REPO_URI" ] || [ "$REPO_URI" = "None" ]; then
+                    echo "ECR repo export not found. Deploy ScraperPlatformStack first."
+                    exit 2
+                  fi
+                  echo "REPO_URI=$REPO_URI" >> $GITHUB_ENV
+                  echo "repo_uri=$REPO_URI" >> $GITHUB_OUTPUT
+
+            - name: Set image tags
+              run: |
+                  SHORT_SHA=${GITHUB_SHA::7}
+                  echo "IMG_SHA=$SHORT_SHA" >> $GITHUB_ENV
+                  echo "TAG_LATEST=latest" >> $GITHUB_ENV
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Login to ECR
+              run: |
+                  aws ecr get-login-password --region "$AWS_REGION" | \
+                    docker login --username AWS --password-stdin "$(echo "$REPO_URI" | awk -F/ '{print $1}')"
+
+            - name: Build & push image (linux/amd64)
+              run: |
+                  docker buildx build --platform linux/amd64 \
+                    -t "$REPO_URI:${IMG_SHA}" -t "$REPO_URI:${TAG_LATEST}" \
+                    --push .
+
+            - name: Summary
+              if: always()
+              run: |
+                  {
+                    echo "### Deploy summary"
+                    echo "- Repo: $REPO_URI"
+                    echo "- Tags: \`$IMG_SHA\`, \`latest\`"
+                    echo "- Next Step Function run will use the new image"
+                  } >> $GITHUB_STEP_SUMMARY

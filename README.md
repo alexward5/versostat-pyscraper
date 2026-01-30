@@ -58,3 +58,13 @@ python index.py --schema my_schema --scripts views
 
 **Note:** View scripts require the underlying tables to exist first. Run table scripts before view scripts.
 
+## Deployment
+
+**Prerequisites:** Create `versostat/sportmonks-api-key` in Secrets Manager. Deploy `VersoStat-ScraperPlatformStack-prod` from versostat-infra first.
+
+**Local:** Run `./deploy_scraper.sh` to build, push to ECR, and deploy the stack. Env overrides: `AWS_REGION`, `IMAGE_TAG`, `SPORTMONKS_SECRET_ID`.
+
+**Pipeline:** Push to `main` to trigger GitHub Actions (build + push to ECR).
+
+**After first deploy:** Confirm SNS email subscription; optionally test with `aws stepfunctions start-execution --state-machine-arn <arn> --input '{"schema":"my_schema"}'`.
+

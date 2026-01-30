@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any, cast
 
 import requests
@@ -8,7 +9,9 @@ from dotenv import load_dotenv
 
 from ..utils.logger import setup_logger
 
-load_dotenv(".env.local")
+# Load .env.local only when it exists (ECS uses env vars/secrets directly)
+if Path(".env.local").exists():
+    load_dotenv(".env.local", override=False)
 
 logger = setup_logger(__name__)
 

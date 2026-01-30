@@ -1,5 +1,6 @@
 import argparse
 import inspect
+import os
 from typing import Any, Literal
 
 from src.scripts.tables import crosswalk_player_id, fpl_events, fpl_player, fpl_player_gameweek, fpl_teams
@@ -112,7 +113,12 @@ def main() -> None:
         description="Run table/view scripts",
     )
 
-    parser.add_argument("--schema", type=str, required=True, help="Database schema name")
+    parser.add_argument(
+        "--schema",
+        type=str,
+        default=os.getenv("SCRIPT_SCHEMA"),
+        help="Database schema name (or set SCRIPT_SCHEMA env var for ECS)",
+    )
     parser.add_argument(
         "--scripts",
         nargs="+",
@@ -125,6 +131,9 @@ def main() -> None:
     parser.add_argument("--limit-teams", type=int, help="Limit teams (for SM overall scripts)")
 
     args = parser.parse_args()
+
+    if not args.schema:
+        parser.error("--schema or SCRIPT_SCHEMA env var is required")
 
     scripts_param = (
         args.scripts[0]

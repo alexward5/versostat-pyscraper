@@ -1,0 +1,25 @@
+{
+    "app": "python bin/scraper_service_stack.py",
+    "watch": {
+        "include": ["**"],
+        "exclude": [
+            "README.md",
+            "cdk*.json",
+            "**/*.pyc",
+            "__pycache__",
+            ".venv",
+            "node_modules"
+        ]
+    },
+    "context": {
+        "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+        "@aws-cdk/core:checkSecretUsage": true,
+        "@aws-cdk/core:target-partitions": ["aws", "aws-cn"],
+        "envs": {
+            "prod": {
+                "account": "586999013151",
+                "region": "us-east-1"
+            }
+        }
+    }
+}

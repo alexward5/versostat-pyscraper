@@ -6,6 +6,10 @@ psycopg2-binary
 rapidfuzz
 requests
 
+# cdk packages
+aws-cdk-lib
+constructs
+
 # dev-packages
 black
 pyright
