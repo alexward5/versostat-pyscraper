@@ -1,6 +1,7 @@
 .vscode
 .cursor
 **__pycache__**
+cdk.out
 .DS_Store
 todo
 testing/*
