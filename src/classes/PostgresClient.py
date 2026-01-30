@@ -22,6 +22,7 @@ class PostgresClient:
     def __init__(self) -> None:
         self.dbname = os.getenv("DB_NAME")
         self.user = os.getenv("DB_USER")
+        self.password = os.getenv("DB_PASSWORD")
         self.host = os.getenv("DB_HOST")
         self.port = os.getenv("DB_PORT")
 
@@ -34,6 +35,8 @@ class PostgresClient:
             "host": self.host,
             "port": self.port,
         }
+        if self.password:
+            conn_kwargs["password"] = self.password
 
         sslmode = os.getenv("PGSSLMODE")
         if sslmode:
