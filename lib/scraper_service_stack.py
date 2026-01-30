@@ -151,7 +151,7 @@ class ScraperServiceStack(cdk.Stack):
         # ---- ECS RunTask helpers ----
         def make_run_task(scripts: str) -> tasks.EcsRunTask:
             """Create ECS RunTask with schema from input and given scripts."""
-            return tasks.EcsRunTask(
+            task = tasks.EcsRunTask(
                 self,
                 f"Run{scripts.replace('_', '').title()}",
                 cluster=cluster,
@@ -176,6 +176,8 @@ class ScraperServiceStack(cdk.Stack):
                 security_groups=[scraper_sg],
                 subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
             )
+            task.add_retry(max_attempts=0)
+            return task
 
         # ---- Step Function: Parallel (fpl, sm) -> Crosswalk -> Views ----
         run_fpl = make_run_task("fpl")
