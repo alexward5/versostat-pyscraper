@@ -180,14 +180,7 @@ class ScraperServiceStack(cdk.Stack):
             task.add_retry(max_attempts=0)
             return task
 
-        # ---- Step Function: Pass (ensures schema in output) -> Parallel -> Crosswalk -> Views ----
-        # Pass state propagates schema so it survives ECS RunTask output replacement.
-        setup_input = sfn.Pass(
-            self,
-            "SetupInput",
-            parameters={"schema": "my_schema"},
-        )
-
+        # ---- Step Function: Parallel (fpl, sm) -> Crosswalk -> Views ----
         run_fpl = make_run_task("fpl")
         run_sm = make_run_task("sm")
         parallel = sfn.Parallel(
@@ -211,11 +204,9 @@ class ScraperServiceStack(cdk.Stack):
             subs.EmailSubscription("alexanderward5@gmail.com")
         )
 
-        # Chain: setup -> parallel -> crosswalk -> views
+        # Chain: parallel -> crosswalk -> views
         definition = (
-            setup_input
-            .next(parallel)
-            .next(run_crosswalk)
+            parallel.next(run_crosswalk)
             .next(run_views)
         )
 
