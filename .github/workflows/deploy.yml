@@ -63,6 +63,24 @@ jobs:
                     -t "$REPO_URI:${IMG_SHA}" -t "$REPO_URI:${TAG_LATEST}" \
                     --push .
 
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Install CDK dependencies
+              run: pip install aws-cdk-lib constructs
+
+            - name: Deploy ScraperServiceStack
+              run: |
+                  SECRET_ARN=$(aws secretsmanager describe-secret \
+                    --secret-id versostat/sportmonks-api-key \
+                    --region "$AWS_REGION" --query ARN --output text)
+                  cdk deploy VersoStat-ScraperServiceStack-prod \
+                    -c sportmonksSecretArn="$SECRET_ARN" \
+                    -c imageTag="${TAG_LATEST}" \
+                    --require-approval never
+
             - name: Summary
               if: always()
               run: |
@@ -70,5 +88,5 @@ jobs:
                     echo "### Deploy summary"
                     echo "- Repo: $REPO_URI"
                     echo "- Tags: \`$IMG_SHA\`, \`latest\`"
-                    echo "- Next Step Function run will use the new image"
+                    echo "- ScraperServiceStack deployed (Step Function + task definition)"
                   } >> $GITHUB_STEP_SUMMARY
