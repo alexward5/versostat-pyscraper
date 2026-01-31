@@ -175,6 +175,7 @@ class ScraperServiceStack(cdk.Stack):
                 ),
                 security_groups=[scraper_sg],
                 subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
+                result_path="$.taskResult",
             )
             task.add_retry(max_attempts=0)
             return task
