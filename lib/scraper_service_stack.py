@@ -164,7 +164,7 @@ class ScraperServiceStack(cdk.Stack):
                         environment=[
                             tasks.TaskEnvironmentVariable(
                                 name="SCRIPT_SCHEMA",
-                                value=sfn.JsonPath.string_at("$.schema"),
+                                value=sfn.JsonPath.string_at("$$.Execution.Input.schema"),
                             )
                         ],
                     )
