@@ -76,7 +76,7 @@ jobs:
                   SECRET_ARN=$(aws secretsmanager describe-secret \
                     --secret-id versostat/sportmonks-api-key \
                     --region "$AWS_REGION" --query ARN --output text)
-                  cdk deploy VersoStat-ScraperServiceStack-prod \
+                  npx --yes aws-cdk deploy VersoStat-ScraperServiceStack-prod \
                     -c sportmonksSecretArn="$SECRET_ARN" \
                     -c imageTag="${TAG_LATEST}" \
                     --require-approval never
