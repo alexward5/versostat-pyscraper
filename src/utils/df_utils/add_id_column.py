@@ -14,10 +14,11 @@ def add_id_column(
     if missing_columns:
         raise ValueError(f"Source columns not found in DataFrame: {', '.join(missing_columns)}")
 
-    # Create concatenated string from source columns and generate UUID5
+    # Create concatenated string from source columns and generate UUID5.
+    # Use "_" separator to avoid collisions (e.g. element 5 + round 21 vs element 52 + round 1).
     def generate_id(row: pd.Series) -> str:
         values = [str(row[col]) for col in source_columns]
-        concatenated = "".join(values)
+        concatenated = "_".join(values)
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, concatenated))
 
     df[id_column_name] = df.apply(generate_id, axis=1)
