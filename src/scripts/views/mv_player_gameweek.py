@@ -15,7 +15,12 @@ def main(schema: str) -> None:
     db = PostgresClient()
 
     # Verify required tables exist
-    required_tables = ["fpl_player_gameweek", "sm_player_fixtures", "crosswalk_player_id", "fpl_player"]
+    required_tables = [
+        "fpl_player_gameweek",
+        "sm_player_fixtures",
+        "crosswalk_player_id",
+        "fpl_player",
+    ]
     for table in required_tables:
         if not db.table_exists(schema, table):
             raise ValueError(
@@ -68,6 +73,13 @@ def main(schema: str) -> None:
         columns=["fpl_player_id"],
     )
 
+    db.create_index(
+        schema=schema,
+        table_name=VIEW_NAME,
+        index_name=f"idx_{VIEW_NAME}_fpl_player_id_round",
+        columns=["fpl_player_id", "fpl_round"],
+    )
+
     db.close()
 
     log_script_complete(
@@ -78,7 +90,11 @@ def main(schema: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create mv_player_gameweek materialized view")
-    parser.add_argument("--schema", type=str, required=True, help="Database schema name to use")
+    parser = argparse.ArgumentParser(
+        description="Create mv_player_gameweek materialized view"
+    )
+    parser.add_argument(
+        "--schema", type=str, required=True, help="Database schema name to use"
+    )
     args = parser.parse_args()
     main(args.schema)
