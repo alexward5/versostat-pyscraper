@@ -22,7 +22,7 @@ def process_player_history(history: list[dict[str, Any]], player_id: int) -> pd.
         return None
 
     df = pd.DataFrame(history)
-    df = add_id_column(df, source_columns=["element", "round"], id_column_name=PRIMARY_KEY)
+    df = add_id_column(df, source_columns=["element", "fixture"], id_column_name=PRIMARY_KEY)
     df = transform_column(df, "kickoff_time", standardize_to_date)
     df = prepare_for_insert(df, PRIMARY_KEY)
 
