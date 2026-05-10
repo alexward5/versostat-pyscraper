@@ -9,6 +9,8 @@ import psycopg2.extras
 from dotenv import load_dotenv
 from psycopg2 import sql
 
+from ..utils.pg_utils.map_pandas_dtype_to_postgres import map_pandas_dtype_to_postgres
+
 from ..utils.logger import setup_logger
 
 # Load .env.local only when it exists (ECS uses env vars/secrets directly)
@@ -162,6 +164,53 @@ class PostgresClient:
         with self._cursor() as cur:
             cur.execute(query, row_values)
 
+    def get_table_columns(self, schema: str, table_name: str) -> list[str]:
+        """Return existing column names for a table, in ordinal order."""
+        with self._cursor(dict_cursor=True) as cur:
+            cur.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = %s AND table_name = %s ORDER BY ordinal_position",
+                (schema, table_name),
+            )
+            return [row["column_name"] for row in cur.fetchall()]
+
+    def table_has_rows(self, schema: str, table_name: str) -> bool:
+        """Return True if the table contains at least one row."""
+        with self._cursor() as cur:
+            cur.execute(
+                sql.SQL("SELECT EXISTS (SELECT 1 FROM {}.{} LIMIT 1)").format(
+                    sql.Identifier(schema),
+                    sql.Identifier(table_name),
+                )
+            )
+            return bool(cur.fetchone()[0])
+
+    def add_missing_columns(self, schema: str, table_name: str, df: pd.DataFrame) -> None:
+        """ALTER TABLE to add any DataFrame columns not yet present in the table.
+
+        NOT NULL is applied only when the table is empty (e.g. freshly created at the
+        start of a new season). When existing rows are present, columns are added
+        without NOT NULL so those rows are unaffected.
+        """
+        existing = set[str](self.get_table_columns(schema, table_name))
+        has_rows = self.table_has_rows(schema, table_name)
+        for col in df.columns:
+            col_str = str(col)
+            if col_str in existing:
+                continue
+            pg_type = map_pandas_dtype_to_postgres(df[col_str].dtype)
+            not_null = sql.SQL("") if has_rows else sql.SQL(" NOT NULL")
+            with self._cursor() as cur:
+                cur.execute(
+                    sql.SQL("ALTER TABLE {}.{} ADD COLUMN IF NOT EXISTS {} {}{}").format(
+                        sql.Identifier(schema),
+                        sql.Identifier(table_name),
+                        sql.Identifier(col_str),
+                        sql.SQL(pg_type),
+                        not_null,
+                    )
+                )
+            logger.info("Added column %s (%s) to %s.%s", col_str, pg_type, schema, table_name)
+
     def insert_dataframe(
         self,
         schema: str,
@@ -170,6 +219,8 @@ class PostgresClient:
         primary_key: str,
     ) -> None:
         """Insert all rows from a dataframe into the database."""
+        if self.table_exists(schema, table_name):
+            self.add_missing_columns(schema, table_name, df)
         columns = list[str](df.columns)
         for _, row in df.iterrows():
             self.insert_row(

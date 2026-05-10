@@ -106,6 +106,9 @@ def run_scripts(
 
     logger.info("=" * 60)
 
+    if failed:
+        raise RuntimeError(f"Pipeline failed: {', '.join(failed)}")
+
 
 def main() -> None:
     """CLI entry point."""
