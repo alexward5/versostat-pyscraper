@@ -12,7 +12,6 @@ from aws_cdk import (
     aws_logs as logs,
     aws_secretsmanager as secrets,
     aws_sns as sns,
-    aws_sns_subscriptions as subs,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
 )
@@ -29,14 +28,13 @@ class ScraperServiceStack(cdk.Stack):
         *,
         env: cdk.Environment | None = None,
         sportmonks_secret_arn: str | None = None,
-        **kwargs: object,
     ) -> None:
-        super().__init__(scope, id, env=env, **kwargs)
+        super().__init__(scope, id, env=env)
 
         if not sportmonks_secret_arn:
             raise ValueError(
-                "sportmonksSecretArn required in CDK context. "
-                "Create the secret first, then: cdk deploy -c sportmonksSecretArn=arn:aws:secretsmanager:..."
+                "sportmonksSecretArn required in CDK context. Create the secret first, "
+                + "then: cdk deploy -c sportmonksSecretArn=arn:aws:secretsmanager:..."
             )
 
         # ---- Imports from other stacks ----
@@ -204,7 +202,13 @@ class ScraperServiceStack(cdk.Stack):
             "ScraperFailureTopic",
             display_name="VersoStat Scraper Failures",
         )
-        failure_topic.add_subscription(subs.EmailSubscription("alexanderward5@gmail.com"))
+        sns.CfnSubscription(
+            self,
+            "ScraperFailureEmailSubscription",
+            protocol="email",
+            topic_arn=failure_topic.topic_arn,
+            endpoint="alexanderward5@gmail.com",
+        )
 
         # Chain: parallel -> crosswalk -> views
         definition = parallel.next(run_crosswalk).next(run_views)
@@ -230,7 +234,7 @@ class ScraperServiceStack(cdk.Stack):
                     "stateMachineArn": [state_machine.state_machine_arn],
                 },
             ),
-            targets=[targets.SnsTopic(failure_topic)],
+            targets=[targets.SnsTopic(failure_topic)],  # pyright: ignore[reportArgumentType]
         )
 
         # EventBridge schedule: 01:30 UTC daily
@@ -245,7 +249,7 @@ class ScraperServiceStack(cdk.Stack):
                 year="*",
             ),
             targets=[
-                targets.SfnStateMachine(
+                targets.SfnStateMachine(  # pyright: ignore[reportArgumentType]
                     state_machine,
                     input=events.RuleTargetInput.from_object({"schema": "my_schema"}),
                 )
