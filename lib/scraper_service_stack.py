@@ -1,4 +1,5 @@
 """Scraper service stack: ECS task, Step Functions, EventBridge schedule, SNS failures."""
+
 from __future__ import annotations
 
 import aws_cdk as cdk
@@ -177,7 +178,10 @@ class ScraperServiceStack(cdk.Stack):
                 subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
                 result_path="$.taskResult",
             )
-            task.add_retry(max_attempts=0)
+            task.add_retry(
+                max_attempts=1,
+                interval=cdk.Duration.minutes(2),
+            )
             return task
 
         # ---- Step Function: Parallel (fpl, sm) -> Crosswalk -> Views ----
@@ -200,15 +204,10 @@ class ScraperServiceStack(cdk.Stack):
             "ScraperFailureTopic",
             display_name="VersoStat Scraper Failures",
         )
-        failure_topic.add_subscription(
-            subs.EmailSubscription("alexanderward5@gmail.com")
-        )
+        failure_topic.add_subscription(subs.EmailSubscription("alexanderward5@gmail.com"))
 
         # Chain: parallel -> crosswalk -> views
-        definition = (
-            parallel.next(run_crosswalk)
-            .next(run_views)
-        )
+        definition = parallel.next(run_crosswalk).next(run_views)
 
         state_machine = sfn.StateMachine(
             self,
