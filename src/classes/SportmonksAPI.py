@@ -32,17 +32,15 @@ class SportmonksAPI:
         self._api_key = api_key
         self._last_request_time: float = 0
         self._types_cache: dict[int, str] = {}
+        self._types_loaded: bool = False
         self._season_id: int | None = None
-
-        self._fetch_types()
-        self._season_id = self._get_current_season_id()
-        logger.info("Initialized SportmonksAPI with season ID: %s", self._season_id)
 
     @property
     def current_season_id(self) -> int:
         """Return the current Premier League season ID."""
         if self._season_id is None:
             self._season_id = self._get_current_season_id()
+            logger.info("Initialized SportmonksAPI with season ID: %s", self._season_id)
         return self._season_id
 
     def _get_current_season_id(self) -> int:
@@ -88,9 +86,12 @@ class SportmonksAPI:
                 self._types_cache[int(type_id)] = self._to_snake_case(type_name)
 
         logger.info("Cached %s stat types", len(self._types_cache))
+        self._types_loaded = True
 
     def get_type_name(self, type_id: int) -> str:
         """Get the human-readable name for a type ID."""
+        if not self._types_loaded:
+            self._fetch_types()
         return self._types_cache.get(type_id, f"type_{type_id}")
 
     def _wait_for_rate_limit(self) -> None:

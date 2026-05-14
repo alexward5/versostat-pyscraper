@@ -51,14 +51,12 @@ def build_player_fixture_row(
     return row
 
 
-def main(schema: str, limit_fixtures: int | None = None) -> None:
+def run(schema: str, api: SportmonksAPI, limit_fixtures: int | None = None) -> None:
     """Scrape Premier League player fixture stats and load into database."""
     log_script_start(__name__)
 
     db = PostgresClient()
     db.create_schema(schema)
-
-    api = SportmonksAPI()
 
     fixtures = api.get_completed_fixtures(limit=limit_fixtures)
 
@@ -127,6 +125,11 @@ def main(schema: str, limit_fixtures: int | None = None) -> None:
         total_fixtures=len(fixtures),
         total_player_fixture_rows=len(df),
     )
+
+
+def main(schema: str, limit_fixtures: int | None = None) -> None:
+    """CLI entry point."""
+    run(schema, SportmonksAPI(), limit_fixtures)
 
 
 if __name__ == "__main__":

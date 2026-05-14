@@ -17,14 +17,12 @@ TABLE_NAME = "sm_team_overall"
 PRIMARY_KEY = "team_id"
 
 
-def main(schema: str, limit_teams: int | None = None) -> None:
+def run(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None:
     """Scrape Premier League team overall stats and load into database."""
     log_script_start(__name__)
 
     db = PostgresClient()
     db.create_schema(schema)
-
-    api = SportmonksAPI()
 
     teams = api.get_teams()
     if limit_teams:
@@ -79,6 +77,11 @@ def main(schema: str, limit_teams: int | None = None) -> None:
     log_script_complete(
         __name__, schema=schema, table_name=TABLE_NAME, total_teams=len(teams), total_rows=len(df)
     )
+
+
+def main(schema: str, limit_teams: int | None = None) -> None:
+    """CLI entry point."""
+    run(schema, SportmonksAPI(), limit_teams)
 
 
 if __name__ == "__main__":

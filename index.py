@@ -3,6 +3,7 @@ import inspect
 import os
 from typing import Any, Literal
 
+from src.classes.SportmonksAPI import SportmonksAPI
 from src.scripts.tables import crosswalk_player_id, fpl_events, fpl_player, fpl_player_gameweek, fpl_teams
 from src.scripts.tables import (
     sm_player_fixtures,
@@ -20,10 +21,10 @@ SCRIPT_MAP = {
     "fpl_player": fpl_player.main,
     "fpl_player_gameweek": fpl_player_gameweek.main,
     "fpl_teams": fpl_teams.main,
-    "sm_player_fixtures": sm_player_fixtures.main,
-    "sm_player_overall": sm_player_overall.main,
-    "sm_team_fixtures": sm_team_fixtures.main,
-    "sm_team_overall": sm_team_overall.main,
+    "sm_player_fixtures": sm_player_fixtures.run,
+    "sm_player_overall": sm_player_overall.run,
+    "sm_team_fixtures": sm_team_fixtures.run,
+    "sm_team_overall": sm_team_overall.run,
     "crosswalk_player_id": crosswalk_player_id.main,
     "mv_player": mv_player.main,
     "mv_player_gameweek": mv_player_gameweek.main,
@@ -67,13 +68,15 @@ def run_scripts(
     successful: list[str] = []
     failed: list[str] = []
 
+    shared_api = SportmonksAPI()
+
     for script_name in scripts_to_run:
         try:
             script_func = SCRIPT_MAP[script_name]
             sig = inspect.signature(script_func)
             supported_params = set(sig.parameters.keys()) - {"schema"}
             filtered_kwargs: dict[str, Any] = {
-                k: v for k, v in kwargs.items() if k in supported_params
+                k: v for k, v in {**kwargs, "api": shared_api}.items() if k in supported_params
             }
 
             script_func(schema, **filtered_kwargs)
