@@ -4,7 +4,13 @@ import os
 from typing import Any, Literal
 
 from src.classes.SportmonksAPI import SportmonksAPI
-from src.scripts.tables import crosswalk_player_id, fpl_events, fpl_player, fpl_player_gameweek, fpl_teams
+from src.scripts.tables import (
+    crosswalk_player_id,
+    fpl_events,
+    fpl_player,
+    fpl_player_gameweek,
+    fpl_teams,
+)
 from src.scripts.tables import (
     sm_player_fixtures,
     sm_player_overall,
