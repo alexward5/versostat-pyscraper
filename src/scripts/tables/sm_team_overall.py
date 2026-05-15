@@ -1,6 +1,3 @@
-from typing import Any
-
-
 import argparse
 
 import pandas as pd
@@ -17,7 +14,7 @@ TABLE_NAME = "sm_team_overall"
 PRIMARY_KEY = "team_id"
 
 
-def run(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None:
+def main(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None:
     """Scrape Premier League team overall stats and load into database."""
     log_script_start(__name__)
 
@@ -34,7 +31,7 @@ def run(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None
 
     all_team_stats: list[dict[str, object]] = []
 
-    for idx, team in enumerate[dict[str, Any]](teams):
+    for idx, team in enumerate(teams):
         team_id = team.get("id")
 
         if should_log_progress(idx + 1, total_teams):
@@ -79,11 +76,6 @@ def run(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None
     )
 
 
-def main(schema: str, limit_teams: int | None = None) -> None:
-    """CLI entry point."""
-    run(schema, SportmonksAPI(), limit_teams)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scrape Sportmonks team overall stats")
     parser.add_argument("--schema", type=str, required=True, help="Database schema name to use")
@@ -94,4 +86,4 @@ if __name__ == "__main__":
         help="Limit to first N teams for testing",
     )
     args = parser.parse_args()
-    main(args.schema, args.limit_teams)
+    main(args.schema, SportmonksAPI(), limit_teams=args.limit_teams)

@@ -14,7 +14,7 @@ TABLE_NAME = "sm_player_overall"
 PRIMARY_KEY = "player_id"
 
 
-def run(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None:
+def main(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None:
     """Scrape Premier League player overall stats and load into database."""
     log_script_start(__name__)
 
@@ -84,13 +84,8 @@ def run(schema: str, api: SportmonksAPI, limit_teams: int | None = None) -> None
         schema=schema,
         table_name=TABLE_NAME,
         total_teams=len(teams),
-        total_player_rows=len(df)
+        total_player_rows=len(df),
     )
-
-
-def main(schema: str, limit_teams: int | None = None) -> None:
-    """CLI entry point."""
-    run(schema, SportmonksAPI(), limit_teams)
 
 
 if __name__ == "__main__":
@@ -103,4 +98,4 @@ if __name__ == "__main__":
         help="Limit to first N teams for testing",
     )
     args = parser.parse_args()
-    main(args.schema, args.limit_teams)
+    main(args.schema, SportmonksAPI(), limit_teams=args.limit_teams)

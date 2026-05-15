@@ -63,7 +63,7 @@ def build_team_fixture_row(
     return row
 
 
-def run(schema: str, api: SportmonksAPI, limit_fixtures: int | None = None) -> None:
+def main(schema: str, api: SportmonksAPI, limit_fixtures: int | None = None) -> None:
     """Scrape Premier League team fixture stats and load into database."""
     log_script_start(__name__)
 
@@ -157,11 +157,6 @@ def run(schema: str, api: SportmonksAPI, limit_fixtures: int | None = None) -> N
     )
 
 
-def main(schema: str, limit_fixtures: int | None = None) -> None:
-    """CLI entry point."""
-    run(schema, SportmonksAPI(), limit_fixtures)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scrape Sportmonks team fixture stats")
     parser.add_argument("--schema", type=str, required=True, help="Database schema name to use")
@@ -172,4 +167,4 @@ if __name__ == "__main__":
         help="Limit to first N fixtures for testing",
     )
     args = parser.parse_args()
-    main(args.schema, args.limit_fixtures)
+    main(args.schema, SportmonksAPI(), limit_fixtures=args.limit_fixtures)
